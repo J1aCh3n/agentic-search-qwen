@@ -1,0 +1,7 @@
+chromadb==0.4.22
+whoosh>=2.7.4
+openai>=1.0.0
+numpy==1.26.4
+posthog<3
+streamlit>=1.0.0
+python-dotenv>=1.0.0
