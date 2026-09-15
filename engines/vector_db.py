@@ -8,7 +8,8 @@ from typing import Any
 
 import chromadb
 
-from config import VECTOR_DB_DIR
+from config import VECTOR_DB_DIR, EMBEDDING_MODEL, LLM_API_KEY, LLM_BASE_URL
+from langchain_openai import OpenAIEmbeddings
 
 
 class HashEmbeddingFunction:
@@ -40,11 +41,27 @@ class HashEmbeddingFunction:
             return vector
         return [value / norm for value in vector]
 
+class DashScopeEmbeddingFunction:
+    """Real embedding model from DashScope (text-embedding-v4)."""
+
+    def __init__(self) -> None:
+        self.embeddings = OpenAIEmbeddings(
+            model=EMBEDDING_MODEL,
+            base_url=LLM_BASE_URL,
+            api_key=LLM_API_KEY,
+            check_embedding_ctx_length=False,
+            chunk_size=10
+        )
+
+    def __call__(self, input: list[str]) -> list[list[float]]:
+        return self.embeddings.embed_documents(input)
+
 
 class VectorDBEngine:
     def __init__(self) -> None:
         self.client = chromadb.PersistentClient(path=VECTOR_DB_DIR)
-        self.embedding_function = HashEmbeddingFunction()
+        # self.embedding_function = HashEmbeddingFunction()
+        self.embedding_function = DashScopeEmbeddingFunction()
         self.collections: dict[str, Any] = {}
 
     def _get_collection(self, name: str):

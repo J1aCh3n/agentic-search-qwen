@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from core.agent import AgenticSearchAgent
+from core.lc_agent import LangChainSearchAgent
 from seed_data_large import ensure_seed_data
 
 
@@ -23,7 +23,7 @@ def main() -> None:
     print("\n[*] Preparing demo data...")
     ensure_seed_data()
 
-    agent = AgenticSearchAgent()
+    agent = LangChainSearchAgent()
 
     print("\n" + "=" * 72)
     print("  System ready. Enter a question to search, or type 'quit' to exit.")

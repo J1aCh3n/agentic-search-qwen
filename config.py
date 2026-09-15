@@ -16,6 +16,7 @@ DB_PATH = os.path.join(DB_DIR, "enterprise.db")
 LLM_API_KEY = os.environ.get("DASHSCOPE_API_KEY", "")
 LLM_BASE_URL = os.environ.get("DASHSCOPE_BASE_URL", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1")
 LLM_MODEL = os.environ.get("DASHSCOPE_MODEL", "qwen3.6-plus")
+EMBEDDING_MODEL = os.environ.get("DASHSCOPE_EMBEDDING_MODEL", "text-embedding-v4")
 
 MAX_SEARCH_ROUNDS = 20
 

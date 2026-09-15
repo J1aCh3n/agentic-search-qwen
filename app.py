@@ -4,7 +4,7 @@ import json
 
 import streamlit as st
 
-from core.agent import AgenticSearchAgent
+from core.lc_agent import LangChainSearchAgent
 from seed_data_large import ensure_seed_data
 
 
@@ -54,9 +54,9 @@ st.markdown(
 
 
 @st.cache_resource(show_spinner=False)
-def get_agent() -> AgenticSearchAgent:
+def get_agent() -> LangChainSearchAgent:
     ensure_seed_data()
-    return AgenticSearchAgent()
+    return LangChainSearchAgent()
 
 
 def init_session_state() -> None:
@@ -71,7 +71,7 @@ def render_json_block(title: str, payload: object) -> None:
         st.code(json.dumps(payload, indent=2, ensure_ascii=False, default=str), language="json")
 
 
-def perform_search(agent: AgenticSearchAgent, question: str) -> str:
+def perform_search(agent: LangChainSearchAgent, question: str) -> str:
     status_area = st.empty()
     trace_area = st.container()
     final_area = st.empty()
