@@ -1,0 +1,182 @@
+[
+  {
+    "id": "hb-meal-direct",
+    "category": "direct",
+    "type": "answerable",
+    "question": "How much can I spend on meals per day when travelling?",
+    "expected_source": "employee_handbook.md",
+    "answer_keywords": [["85"]]
+  },
+  {
+    "id": "hb-remote-direct",
+    "category": "direct",
+    "type": "answerable",
+    "question": "How many days per week can engineers work remotely?",
+    "expected_source": "employee_handbook.md",
+    "answer_keywords": [["four days", "4 days"]]
+  },
+  {
+    "id": "hb-approval-comma",
+    "category": "direct",
+    "type": "answerable",
+    "question": "When does an expense need manager approval before the money is spent?",
+    "expected_source": "employee_handbook.md",
+    "answer_keywords": [["1,000", "1000"]],
+    "note": "The handbook writes 1,000 with a comma, so both spellings must be accepted."
+  },
+  {
+    "id": "eg-approvals-direct",
+    "category": "direct",
+    "type": "answerable",
+    "question": "How many approvals does a pull request need?",
+    "expected_source": "engineering_guide.md",
+    "answer_keywords": [["two approvals", "2 approvals"]]
+  },
+  {
+    "id": "eg-pr-size-direct",
+    "category": "direct",
+    "type": "answerable",
+    "question": "How large can a pull request be before it is sent back for splitting?",
+    "expected_source": "engineering_guide.md",
+    "answer_keywords": [["400"]]
+  },
+  {
+    "id": "hb-vacation-paraphrase",
+    "category": "paraphrase",
+    "type": "answerable",
+    "question": "How much paid time off do I get each year?",
+    "expected_source": "employee_handbook.md",
+    "answer_keywords": [["twenty days", "20 days"]]
+  },
+  {
+    "id": "hb-home-office-paraphrase",
+    "category": "paraphrase",
+    "type": "answerable",
+    "question": "Will the company pay for a desk or chair so I can work from home?",
+    "expected_source": "employee_handbook.md",
+    "answer_keywords": [["750"]],
+    "note": "The document says 'home office budget', not 'desk or chair so I can work from home'."
+  },
+  {
+    "id": "eg-coverage-paraphrase",
+    "category": "paraphrase",
+    "type": "answerable",
+    "question": "What share of the code has to be exercised by unit tests?",
+    "expected_source": "engineering_guide.md",
+    "answer_keywords": [["80"]]
+  },
+  {
+    "id": "eg-sev1-paraphrase",
+    "category": "paraphrase",
+    "type": "answerable",
+    "question": "How quickly must someone respond when the whole service goes down?",
+    "expected_source": "engineering_guide.md",
+    "answer_keywords": [["thirty minutes", "30 minutes"]],
+    "note": "The document calls this a SEV1 full outage; the question never says SEV1."
+  },
+  {
+    "id": "hb-hotel-multi",
+    "category": "multi_fact",
+    "type": "answerable",
+    "question": "What are the hotel limits in Toronto and in other cities?",
+    "expected_source": "employee_handbook.md",
+    "answer_keywords": [["260"], ["180"]]
+  },
+  {
+    "id": "hb-sick-leave-multi",
+    "category": "multi_fact",
+    "type": "answerable",
+    "question": "How many paid sick days do we get, and when is a doctor's note required?",
+    "expected_source": "employee_handbook.md",
+    "answer_keywords": [
+      ["ten paid days", "10 paid days", "ten paid sick days", "10 paid sick days", "10 days", "10 sick days"],
+      ["three consecutive", "3 consecutive"]
+    ],
+    "note": "The model wrote '10 paid sick days', which the first version of these keywords did not accept."
+  },
+  {
+    "id": "eg-release-window-multi",
+    "category": "multi_fact",
+    "type": "answerable",
+    "question": "On which days and at what time are production releases deployed?",
+    "expected_source": "engineering_guide.md",
+    "answer_keywords": [["tuesday"], ["thursday"], ["14:00", "2:00 pm", "2 pm"]]
+  },
+  {
+    "id": "hb-promotion-short",
+    "category": "short",
+    "type": "answerable",
+    "question": "promotion",
+    "expected_source": "employee_handbook.md",
+    "answer_keywords": [["december"]]
+  },
+  {
+    "id": "eg-on-call-short",
+    "category": "short",
+    "type": "answerable",
+    "question": "on-call rotation",
+    "expected_source": "engineering_guide.md",
+    "answer_keywords": [["seven days", "7 days"], ["monday"]],
+    "note": "'seven days' alone also appears in the vulnerability section, so Monday pins the right chunk."
+  },
+  {
+    "id": "eg-vulnerability-short",
+    "category": "short",
+    "type": "answerable",
+    "question": "critical vulnerability patch deadline",
+    "expected_source": "engineering_guide.md",
+    "answer_keywords": [["critical"], ["seven days", "7 days"]]
+  },
+  {
+    "id": "neg-cake",
+    "category": "unrelated",
+    "type": "unrelated",
+    "question": "chocolate cake recipe"
+  },
+  {
+    "id": "neg-weather",
+    "category": "unrelated",
+    "type": "unrelated",
+    "question": "What is the weather in Paris?"
+  },
+  {
+    "id": "neg-world-cup",
+    "category": "unrelated",
+    "type": "unrelated",
+    "question": "Who won the 2022 FIFA World Cup?"
+  },
+  {
+    "id": "neg-sourdough",
+    "category": "unrelated",
+    "type": "unrelated",
+    "question": "How do I feed a sourdough starter?"
+  },
+  {
+    "id": "trap-bereavement",
+    "category": "near_miss",
+    "type": "near_miss",
+    "question": "How many days of bereavement leave do employees get?",
+    "note": "Retrieval returns the sick leave section; the handbook never mentions bereavement leave."
+  },
+  {
+    "id": "trap-probation",
+    "category": "near_miss",
+    "type": "near_miss",
+    "question": "How long is the probation period for new hires?",
+    "note": "Retrieval returns the new joiner onboarding text; no probation period is defined."
+  },
+  {
+    "id": "trap-conference-budget",
+    "category": "near_miss",
+    "type": "near_miss",
+    "question": "What is the annual budget for attending conferences and training?",
+    "note": "The handbook has a home office budget and expense limits, but no training budget."
+  },
+  {
+    "id": "trap-migration-approvals",
+    "category": "near_miss",
+    "type": "near_miss",
+    "question": "How many approvals does a database migration need?",
+    "note": "Pull requests and hotfixes need two approvals; migrations have no stated approval rule."
+  }
+]
