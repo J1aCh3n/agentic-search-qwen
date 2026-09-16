@@ -4,10 +4,11 @@ import os
 import sqlite3
 from pathlib import Path
 
-from config import CODE_REPO_DIR, DB_PATH
+from config import CODE_REPO_DIR, DB_PATH, DATA_DIR
 from engines.database import DatabaseEngine
 from engines.keyword_search import KeywordSearchEngine
 from engines.vector_db import VectorDBEngine
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
 EMPLOYEES = [
@@ -225,6 +226,37 @@ SAMPLE_CODE_FILES = {
     "tests/test_chat_service.py": '"""Chat service tests."""\nfrom src.services.chat_service import ChatService\n\ndef test_chat_returns_demo_response():\n    service = ChatService()\n    assert "Demo response" in service.chat("hello")\n',
 }
 
+def seed_documents(vector_db: VectorDBEngine) -> int:
+    """Load markdown files from data/docs/, split them, and store them."""
+    docs_dir = Path(DATA_DIR) / "docs"
+    if not docs_dir.exists():
+        return 0
+
+    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    total = 0
+
+    for path in sorted(docs_dir.glob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        chunks = splitter.split_text(text)
+
+        ids = [f"{path.stem}_{i}" for i in range(len(chunks))]
+        metadatas = [
+            {
+                "source": path.name,
+                "chunk_index": i,
+            }
+            for i in range(len(chunks))
+        ]
+        vector_db.add_documents(
+            "handbook",
+            chunks,
+            metadatas=metadatas,
+            ids=ids,
+        )
+
+        total += len(chunks)
+
+    return total
 
 def is_seeded() -> bool:
     if not os.path.exists(DB_PATH):
@@ -279,13 +311,13 @@ def seed_all_large(force: bool = False) -> None:
     vector_db.add_documents("company_info", COMPANY_DOCS, metadatas=[{"category": "company", "source": "profile"} for _ in COMPANY_DOCS])
     vector_db.add_documents("tech_docs", TECH_DOCS, metadatas=[{"category": "engineering", "source": "technical docs"} for _ in TECH_DOCS])
     vector_db.add_documents("meeting_notes", MEETING_NOTES, metadatas=[{"category": "meeting", "source": "meeting notes"} for _ in MEETING_NOTES])
-
+    chunk_count = seed_documents(vector_db) 
     keyword_engine = KeywordSearchEngine()
     keyword_engine.add_documents("policies", POLICIES)
     keyword_engine.add_documents("tech_articles", TECH_ARTICLES)
 
     code_count = generate_code_repo()
-    print(f"Seed complete: {len(EMPLOYEES)} employees, {len(PROJECTS)} projects, {code_count} code files.")
+    print(f"Seed complete: {len(EMPLOYEES)} employees, {len(PROJECTS)} projects, {code_count} code files, {chunk_count} doc chunks.")
 
 
 def ensure_seed_data() -> None:

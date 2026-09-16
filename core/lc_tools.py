@@ -54,10 +54,12 @@ def build_tools(
     @tool
     def vector_search(
         query: str,
-        collection_name: Literal["company_info", "tech_docs", "meeting_notes"] | None = None,
+        collection_name: Literal["company_info", "tech_docs", "meeting_notes", "handbook"] | None = None,
         n_results: int = 5,
     ) -> str:
-        """Search semantic document collections: company profile, technical docs, and meeting notes."""
+        """Search semantic document collections: company profile, technical docs, meeting notes,
+            and the employee handbook plus engineering guide (HR policies, expenses, leave, code review,
+            release process, on-call)."""
         return vector_db.search(query, collection_name=collection_name, n_results=n_results)
 
     @tool

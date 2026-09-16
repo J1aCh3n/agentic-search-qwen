@@ -7,3 +7,4 @@ streamlit>=1.0.0
 python-dotenv>=1.0.0
 langchain>=1.0
 langchain-openai>=1.0
+langchain-text-splitters>=1.0

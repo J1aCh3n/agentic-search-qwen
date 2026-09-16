@@ -8,7 +8,13 @@ from typing import Any
 
 import chromadb
 
-from config import VECTOR_DB_DIR, EMBEDDING_MODEL, LLM_API_KEY, LLM_BASE_URL
+from config import (
+    VECTOR_DB_DIR,
+    LLM_API_KEY,
+    LLM_BASE_URL,
+    EMBEDDING_MODEL,
+    VECTOR_DISTANCE_THRESHOLD,
+)
 from langchain_openai import OpenAIEmbeddings
 
 
@@ -123,6 +129,12 @@ class VectorDBEngine:
             parsed = json.loads(self._format_results(results, name))
             if parsed.get("results"):
                 all_results[name] = parsed["results"]
+        if not all_results:
+            return json.dumps({
+                "results": {},
+                "message": f"No document was within the distance threshold {VECTOR_DISTANCE_THRESHOLD}. The demo dataset does not contain relevant content for this query."
+            }, ensure_ascii=False, indent=2)
+
         return json.dumps({"results": all_results}, ensure_ascii=False, indent=2)
 
     def _format_results(self, results: dict, collection_name: str) -> str:
@@ -133,6 +145,8 @@ class VectorDBEngine:
             metadatas = results.get("metadatas", [[]])[0] if results.get("metadatas") else [{}] * len(docs)
             ids = results.get("ids", [[]])[0] if results.get("ids") else [""] * len(docs)
             for doc, distance, metadata, doc_id in zip(docs, distances, metadatas, ids):
+                if distance > VECTOR_DISTANCE_THRESHOLD:
+                    continue
                 formatted.append(
                     {
                         "id": doc_id,
@@ -141,7 +155,14 @@ class VectorDBEngine:
                         "metadata": metadata,
                     }
                 )
-        return json.dumps({"collection": collection_name, "results": formatted}, ensure_ascii=False, indent=2)
+        payload = {"collection": collection_name, "results": formatted}
+        if not formatted:
+            payload["message"] = (
+                f"No document was within the distance threshold {VECTOR_DISTANCE_THRESHOLD}. "
+                "The demo dataset does not contain relevant content for this query."
+            )
+        return json.dumps(payload, ensure_ascii=False, indent=2)
+
 
     def list_collections(self) -> list[str]:
         return [collection.name for collection in self.client.list_collections()]
