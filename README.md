@@ -95,12 +95,13 @@ DASHSCOPE_API_KEY=your_dashscope_api_key_here
 DASHSCOPE_BASE_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1
 DASHSCOPE_MODEL=qwen3.6-plus
 DASHSCOPE_EMBEDDING_MODEL=text-embedding-v4
+DASHSCOPE_JUDGE_MODEL=qwen3.7-plus-2026-05-26
 VECTOR_DISTANCE_THRESHOLD=0.70
 ```
 
 Use the DashScope endpoint that matches the region where the API key was created. This project defaults to the international endpoint because a China-region endpoint can reject an international key with authentication or entitlement errors.
 
-The same API key is used for both chat completion and embeddings. Seeding calls the embedding endpoint once per chunk, in batches of ten, which is the DashScope batch limit.
+The same API key is used for chat completion, embeddings, and the evaluation judge. DashScope free quota is tracked per model, so the judge runs on its own model and does not use the agent model's quota. Seeding calls the embedding endpoint once per chunk, in batches of ten, which is the DashScope batch limit.
 
 The app can still demonstrate local fallback behavior without an API key, but vector search needs the embedding endpoint. If an API key is present, model/API errors are shown directly instead of being hidden by fallback search.
 
@@ -145,7 +146,7 @@ Baseline at `VECTOR_DISTANCE_THRESHOLD=0.70` with `qwen3.6-plus` and `text-embed
 | Retrieval, 4 unrelated questions | 4/4 blocked by the threshold |
 | Retrieval, 4 near-miss questions | 0/4 blocked by the threshold, 4/4 judged as not answering the question |
 | End-to-end answers (LLM judge) | 23/23 |
-| Answer judge vs. 14 hand-labelled answers | judge 14/14, keyword grading 11/14 |
+| Answer judge vs. 14 hand-labelled answers | `qwen3.7-plus-2026-05-26` 14/14 in two runs, keyword grading 11/14 |
 
 The near-miss row is the main finding: related chunks pass any usable threshold, so refusing those questions depends on the model and the system prompt.
 

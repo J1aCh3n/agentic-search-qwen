@@ -5,10 +5,11 @@ Judge accuracy is checked against human labels with:
 """
 import json
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
+from config import JUDGE_MODEL
 from evals.eval_retrieval import GOLDEN_SET
-from evals.judge_answers import CALIBRATION_SET, Verdict, judge_answer
+from evals.judge_answers import CALIBRATION_SET, Verdict, create_judge, judge_answer
 
 ANSWERABLE = {
     "id": "meal",
@@ -48,7 +49,8 @@ class AnswerJudgeTests(unittest.TestCase):
         self.assertEqual(payload["reference"], NEAR_MISS["refusal_reason"])
         self.assertIsNone(payload["expected_source"])
 
-    def test_errors_become_judge_error_instead_of_a_verdict(self):
+    @patch("evals.judge_model.time.sleep")
+    def test_errors_are_retried_once_then_become_judge_error(self, _sleep):
         cases = {
             "api failure": RuntimeError("API unavailable"),
             "no tool call": None,
@@ -62,8 +64,24 @@ class AnswerJudgeTests(unittest.TestCase):
                 else:
                     judge.invoke.return_value = outcome
                 result = judge_answer(judge, ANSWERABLE, "answer")
+                self.assertEqual(judge.invoke.call_count, 2)
                 self.assertIn("judge_error", result)
                 self.assertNotIn("passed", result)
+
+    @patch("evals.judge_model.time.sleep")
+    def test_transient_error_recovers_on_retry(self, _sleep):
+        judge = Mock()
+        judge.invoke.side_effect = [RuntimeError("429 rate limit"), Verdict(reasoning="ok", passed=True, failure_type="none")]
+        result = judge_answer(judge, ANSWERABLE, "85 CAD per day (employee handbook).")
+        self.assertTrue(result["passed"])
+
+    def test_judge_uses_judge_model_with_thinking_disabled(self):
+        with patch("evals.judge_model.get_chat_model") as factory:
+            create_judge()
+        factory.assert_called_once_with(temperature=0, model=JUDGE_MODEL)
+        _, kwargs = factory.return_value.with_structured_output.call_args
+        self.assertEqual(kwargs["method"], "function_calling")
+        self.assertEqual(kwargs["extra_body"], {"enable_thinking": False})
 
     def test_golden_set_has_a_reference_for_every_case(self):
         for case in json.loads(GOLDEN_SET.read_text(encoding="utf-8")):

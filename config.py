@@ -17,6 +17,9 @@ LLM_API_KEY = os.environ.get("DASHSCOPE_API_KEY", "")
 LLM_BASE_URL = os.environ.get("DASHSCOPE_BASE_URL", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1")
 LLM_MODEL = os.environ.get("DASHSCOPE_MODEL", "qwen3.6-plus")
 EMBEDDING_MODEL = os.environ.get("DASHSCOPE_EMBEDDING_MODEL", "text-embedding-v4")
+# LLM judges in evals/. A dated snapshot keeps scores comparable across runs, and a model
+# other than LLM_MODEL reduces the risk of the agent's model grading its own answers.
+JUDGE_MODEL = os.environ.get("DASHSCOPE_JUDGE_MODEL", "qwen3.7-plus-2026-05-26")
 VECTOR_DISTANCE_THRESHOLD = float(os.environ.get("VECTOR_DISTANCE_THRESHOLD", "0.70"))
 
 MAX_SEARCH_ROUNDS = 20

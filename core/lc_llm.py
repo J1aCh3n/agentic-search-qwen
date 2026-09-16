@@ -15,9 +15,9 @@ def has_api_key() -> bool:
     return bool(LLM_API_KEY.strip())
 
 
-def get_chat_model(temperature: float = 0.1) -> ChatOpenAI:
+def get_chat_model(temperature: float = 0.1, model: str | None = None) -> ChatOpenAI:
     return ChatOpenAI(
-        model=LLM_MODEL,
+        model=model or LLM_MODEL,
         base_url=LLM_BASE_URL,
         # ChatOpenAI refuses an empty key, so use a placeholder when none is set.
         # The agent checks has_api_key() before ever calling the model.

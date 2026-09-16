@@ -8,6 +8,7 @@ from langchain_core.messages import AIMessage
 from langchain_openai import ChatOpenAI
 from pydantic import ValidationError
 
+from config import JUDGE_MODEL
 from evals.eval_retrieval_judge import (
     GOLDEN_SET,
     ChunkVerdict,
@@ -114,11 +115,13 @@ class RetrievalJudgeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "did not call the verdict tool"):
             judge_hits([make_hit()], self.case, judge)
 
-    def test_judge_errors_are_recorded_and_excluded_from_metrics(self):
+    @patch("evals.judge_model.time.sleep")
+    def test_judge_errors_are_retried_once_then_recorded_and_excluded(self, _sleep):
         vector_db = SimpleNamespace(search=Mock(return_value=json.dumps({"results": [make_hit()]})))
         judge = Mock()
         judge.invoke.side_effect = RuntimeError("API unavailable")
         failed = evaluate_case(vector_db, judge, self.case)
+        self.assertEqual(judge.invoke.call_count, 2)
         self.assertIn("API unavailable", failed["judge_error"])
         self.assertIsNone(failed["rank"])
 
@@ -181,9 +184,9 @@ class RetrievalJudgeTests(unittest.TestCase):
 
     def test_function_calling_binding_and_real_langchain_parser_offline(self):
         model = ChatOpenAI(model="qwen-test", api_key="offline-test-key")
-        with patch("evals.eval_retrieval_judge.get_chat_model", return_value=model) as factory:
+        with patch("evals.judge_model.get_chat_model", return_value=model) as factory:
             judge = create_judge()
-        factory.assert_called_once_with(temperature=0)
+        factory.assert_called_once_with(temperature=0, model=JUDGE_MODEL)
         bound = judge.steps[0].kwargs
         self.assertEqual(bound["tool_choice"]["function"]["name"], "RetrievalVerdict")
         self.assertEqual(bound["extra_body"], {"enable_thinking": False})

@@ -12,6 +12,7 @@ Run every command from the project root with the project's Python environment.
 | `eval_agent.py` | End-to-end: runs the full agent, keyword grading, saves every answer to `results/` |
 | `judge_answers.py` | LLM judge for the answers saved by `eval_agent.py`, with a calibration mode |
 | `judge_calibration.json` | 14 hand-labelled answers used to check the answer judge |
+| `judge_model.py` | Judge model setup and retry, shared by both judges |
 | `test_*.py` | Offline tests with fake verdicts. They test plumbing, not judge accuracy |
 
 ## Commands
@@ -48,14 +49,25 @@ python -m unittest evals.test_eval_retrieval_judge evals.test_judge_answers
 
 **Calibrate the judge before trusting it.** `judge_calibration.json` mixes real agent answers with answers written to fool keyword grading. The first judge prompt passed an answer with no citation, reasoning that a simple fact did not need one; calibration caught it and the rubric now lists every pass condition explicitly. Add a fixture whenever you find a new misjudgement. Leave out answers whose correct label is debatable.
 
-**Structured output uses `method="function_calling"`.** LangChain sends the Pydantic verdict model as a tool schema and forces the model to call that tool; no function is executed. DashScope rejects `json_schema` and `json_mode` unless the prompt contains the word "json", so those modes break silently when someone edits the prompt. When the model replies without calling the tool, LangChain returns `None`, which both judges treat as an error.
+**The judge model is separate from the agent model.** `DASHSCOPE_JUDGE_MODEL` defaults to `qwen3.7-plus-2026-05-26` while the agent uses `qwen3.6-plus`. A dated snapshot keeps scores comparable, because an alias such as `qwen3.7-plus` can be moved to a newer model. A different model generation reduces self-preference, and DashScope free quota is per model, so judging does not spend the agent's quota. Calibration results for the models tried:
 
-**Judge errors are not failures.** An API error, a missing tool call, or an invalid verdict is recorded as `judge_error`, excluded from the metrics, and reported. The run continues.
+| Judge model | Agrees with labels | Notes |
+| --- | --- | --- |
+| `qwen3.7-plus-2026-05-26` | 14/14, two runs | about 35 s and 990 tokens per call |
+| `qwen3.6-plus` | 14/14, two runs | the agent's own model |
+| `qwen3.6-flash` | 13/14 | one call returned no verdict; wrote about 600 output tokens per call |
+| `qwen3.7-flash` | 13/14 | passed an uncited answer, claiming it cited employee_handbook.md |
+
+A failure that produces no verdict is visible as `judge_error`; a wrong verdict is silent. Prefer the model whose failures are visible. Re-run `--calibrate` whenever the judge model or prompt changes.
+
+**Structured output uses `method="function_calling"` with thinking disabled.** LangChain sends the Pydantic verdict model as a tool schema and forces the model to call that tool; no function is executed. DashScope rejects `json_schema` and `json_mode` unless the prompt contains the word "json", so those modes break when someone edits the prompt. Forced tool calls are also rejected in thinking mode, which `qwen3.7-plus` enables by default, so `judge_model.py` sends `enable_thinking: false`. When the model replies without calling the tool, LangChain returns `None`, which both judges treat as an error.
+
+**Judge errors are retried once, then excluded.** An API error such as a 429, a missing tool call, or an invalid verdict is retried after three seconds. If it fails again it is recorded as `judge_error`, excluded from the metrics, and reported. The run continues.
 
 ## Limitations
 
 - The calibration set has 14 answers. It catches obvious rubric problems, not rare ones.
-- Qwen judges Qwen. Correlated mistakes and self-preference are possible; use a different judge model for a stronger check.
+- The judge and the agent are different generations of the same Qwen family, so correlated mistakes are still possible. A judge from another model family would be a stronger check.
 - Every configuration has been run once. The agent is not deterministic, so a one-case difference between runs can be noise.
 - Unrelated questions are full sentences that the agent refuses without searching, so they do not measure the distance threshold. Short noisy queries such as `cake` would.
 - Questions and retrieved text are sent to DashScope.

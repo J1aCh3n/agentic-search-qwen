@@ -19,10 +19,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from config import LLM_MODEL
-from core.lc_llm import get_chat_model
+from config import JUDGE_MODEL
 from evals.eval_agent import RESULTS_DIR, grade_keywords
 from evals.eval_retrieval import GOLDEN_SET
+from evals.judge_model import create_structured_judge, with_retry
 
 CALIBRATION_SET = Path(__file__).parent / "judge_calibration.json"
 
@@ -72,9 +72,17 @@ class Verdict(BaseModel):
 
 
 def create_judge() -> Any:
-    # function_calling works with DashScope; json_schema and json_mode return a 400
-    # unless the prompt happens to contain the word "json".
-    return get_chat_model(temperature=0).with_structured_output(Verdict, method="function_calling")
+    return create_structured_judge(Verdict)
+
+
+def ask_judge(judge: Any, payload: dict[str, Any]) -> Verdict:
+    verdict = judge.invoke([("system", JUDGE_PROMPT), ("human", json.dumps(payload, ensure_ascii=False))])
+    if verdict is None:
+        # PydanticToolsParser returns None when the model replies without calling the tool.
+        raise ValueError("judge did not call the verdict tool")
+    if verdict.passed != (verdict.failure_type == "none"):
+        raise ValueError(f"inconsistent verdict: {verdict.model_dump()}")
+    return verdict
 
 
 def judge_answer(judge: Any, case: dict[str, Any], answer: str) -> dict[str, Any]:
@@ -87,15 +95,9 @@ def judge_answer(judge: Any, case: dict[str, Any], answer: str) -> dict[str, Any
         "answer": answer,
     }
     try:
-        verdict = judge.invoke([("system", JUDGE_PROMPT), ("human", json.dumps(payload, ensure_ascii=False))])
+        return with_retry(lambda: ask_judge(judge, payload)).model_dump()
     except Exception as exc:
         return {"judge_error": str(exc)}
-    if verdict is None:
-        # PydanticToolsParser returns None when the model replies without calling the tool.
-        return {"judge_error": "judge did not call the verdict tool"}
-    if verdict.passed != (verdict.failure_type == "none"):
-        return {"judge_error": f"inconsistent verdict: {verdict.model_dump()}"}
-    return verdict.model_dump()
 
 
 def compare(judge: Any, case: dict[str, Any], answer: str) -> dict[str, Any]:
@@ -165,7 +167,7 @@ def grade_file(judge: Any, cases: dict[str, dict], path: Path) -> None:
 
     output = path.with_name(f"{path.stem}-answer-judge.json")
     output.write_text(
-        json.dumps({"judge_model": LLM_MODEL, "judge_prompt": JUDGE_PROMPT, "summary": summary, "cases": rows},
+        json.dumps({"judge_model": JUDGE_MODEL, "judge_prompt": JUDGE_PROMPT, "summary": summary, "cases": rows},
                    indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
@@ -187,6 +189,7 @@ def main() -> None:
 
     cases = {case["id"]: case for case in json.loads(GOLDEN_SET.read_text(encoding="utf-8"))}
     judge = create_judge()
+    print(f"Judge model: {JUDGE_MODEL}")
     if args.calibrate:
         calibrate(judge, cases)
         return
