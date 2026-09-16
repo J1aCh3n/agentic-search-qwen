@@ -5,6 +5,7 @@
     "type": "answerable",
     "question": "How much can I spend on meals per day when travelling?",
     "expected_source": "employee_handbook.md",
+    "reference_answer": "The daily meal allowance during business travel is 85 Canadian dollars per person.",
     "answer_keywords": [["85"]]
   },
   {
@@ -13,6 +14,7 @@
     "type": "answerable",
     "question": "How many days per week can engineers work remotely?",
     "expected_source": "employee_handbook.md",
+    "reference_answer": "Engineers may work remotely up to four days per week.",
     "answer_keywords": [["four days", "4 days"]]
   },
   {
@@ -21,6 +23,7 @@
     "type": "answerable",
     "question": "When does an expense need manager approval before the money is spent?",
     "expected_source": "employee_handbook.md",
+    "reference_answer": "Any single expense above 1,000 Canadian dollars requires manager approval before the money is spent.",
     "answer_keywords": [["1,000", "1000"]],
     "note": "The handbook writes 1,000 with a comma, so both spellings must be accepted."
   },
@@ -30,6 +33,7 @@
     "type": "answerable",
     "question": "How many approvals does a pull request need?",
     "expected_source": "engineering_guide.md",
+    "reference_answer": "Every pull request needs two approvals before merging, and at least one must come from the owning team.",
     "answer_keywords": [["two approvals", "2 approvals"]]
   },
   {
@@ -38,6 +42,7 @@
     "type": "answerable",
     "question": "How large can a pull request be before it is sent back for splitting?",
     "expected_source": "engineering_guide.md",
+    "reference_answer": "Pull requests larger than 400 changed lines are sent back for splitting unless marked as a mechanical refactor.",
     "answer_keywords": [["400"]]
   },
   {
@@ -46,6 +51,7 @@
     "type": "answerable",
     "question": "How much paid time off do I get each year?",
     "expected_source": "employee_handbook.md",
+    "reference_answer": "Full-time employees receive twenty days of paid vacation per calendar year.",
     "answer_keywords": [["twenty days", "20 days"]]
   },
   {
@@ -54,6 +60,7 @@
     "type": "answerable",
     "question": "Will the company pay for a desk or chair so I can work from home?",
     "expected_source": "employee_handbook.md",
+    "reference_answer": "Each engineer receives a one-time home office budget of 750 Canadian dollars for a desk, chair, or monitor.",
     "answer_keywords": [["750"]],
     "note": "The document says 'home office budget', not 'desk or chair so I can work from home'."
   },
@@ -63,6 +70,7 @@
     "type": "answerable",
     "question": "What share of the code has to be exercised by unit tests?",
     "expected_source": "engineering_guide.md",
+    "reference_answer": "Unit test line coverage must stay at or above 80 percent for every service.",
     "answer_keywords": [["80"]]
   },
   {
@@ -71,6 +79,7 @@
     "type": "answerable",
     "question": "How quickly must someone respond when the whole service goes down?",
     "expected_source": "engineering_guide.md",
+    "reference_answer": "A SEV1 full outage requires a response within thirty minutes.",
     "answer_keywords": [["thirty minutes", "30 minutes"]],
     "note": "The document calls this a SEV1 full outage; the question never says SEV1."
   },
@@ -80,6 +89,7 @@
     "type": "answerable",
     "question": "What are the hotel limits in Toronto and in other cities?",
     "expected_source": "employee_handbook.md",
+    "reference_answer": "Hotel spending is capped at 260 Canadian dollars per night in Toronto, Vancouver, and New York, and at 180 Canadian dollars per night elsewhere.",
     "answer_keywords": [["260"], ["180"]]
   },
   {
@@ -88,6 +98,7 @@
     "type": "answerable",
     "question": "How many paid sick days do we get, and when is a doctor's note required?",
     "expected_source": "employee_handbook.md",
+    "reference_answer": "Sick leave is capped at ten paid days per year. A doctor's note is required only when sick leave exceeds three consecutive working days.",
     "answer_keywords": [
       ["ten paid days", "10 paid days", "ten paid sick days", "10 paid sick days", "10 days", "10 sick days"],
       ["three consecutive", "3 consecutive"]
@@ -100,6 +111,7 @@
     "type": "answerable",
     "question": "On which days and at what time are production releases deployed?",
     "expected_source": "engineering_guide.md",
+    "reference_answer": "Production releases go out on Tuesdays and Thursdays between 14:00 and 16:00 Eastern Time.",
     "answer_keywords": [["tuesday"], ["thursday"], ["14:00", "2:00 pm", "2 pm"]]
   },
   {
@@ -108,6 +120,7 @@
     "type": "answerable",
     "question": "promotion",
     "expected_source": "employee_handbook.md",
+    "reference_answer": "Promotion decisions are made only during the December cycle. Employees need at least six months in their current level to be eligible.",
     "answer_keywords": [["december"]]
   },
   {
@@ -116,6 +129,7 @@
     "type": "answerable",
     "question": "on-call rotation",
     "expected_source": "engineering_guide.md",
+    "reference_answer": "The on-call rotation lasts seven days and starts every Monday at 10:00 Eastern Time.",
     "answer_keywords": [["seven days", "7 days"], ["monday"]],
     "note": "'seven days' alone also appears in the vulnerability section, so Monday pins the right chunk."
   },
@@ -125,37 +139,43 @@
     "type": "answerable",
     "question": "critical vulnerability patch deadline",
     "expected_source": "engineering_guide.md",
+    "reference_answer": "Critical vulnerabilities must be patched within seven days.",
     "answer_keywords": [["critical"], ["seven days", "7 days"]]
   },
   {
     "id": "neg-cake",
     "category": "unrelated",
     "type": "unrelated",
-    "question": "chocolate cake recipe"
+    "question": "chocolate cake recipe",
+    "refusal_reason": "The dataset only covers internal company records, policies, engineering documents, and code. It contains no recipes."
   },
   {
     "id": "neg-weather",
     "category": "unrelated",
     "type": "unrelated",
-    "question": "What is the weather in Paris?"
+    "question": "What is the weather in Paris?",
+    "refusal_reason": "The dataset only covers internal company records, policies, engineering documents, and code. It contains no weather data."
   },
   {
     "id": "neg-world-cup",
     "category": "unrelated",
     "type": "unrelated",
-    "question": "Who won the 2022 FIFA World Cup?"
+    "question": "Who won the 2022 FIFA World Cup?",
+    "refusal_reason": "The dataset only covers internal company records, policies, engineering documents, and code. It contains no sports results, so the answer must not come from general knowledge."
   },
   {
     "id": "neg-sourdough",
     "category": "unrelated",
     "type": "unrelated",
-    "question": "How do I feed a sourdough starter?"
+    "question": "How do I feed a sourdough starter?",
+    "refusal_reason": "The dataset only covers internal company records, policies, engineering documents, and code. It contains no baking or cooking content."
   },
   {
     "id": "trap-bereavement",
     "category": "near_miss",
     "type": "near_miss",
     "question": "How many days of bereavement leave do employees get?",
+    "refusal_reason": "The employee handbook covers vacation, sick leave, and parental leave, but does not define bereavement leave.",
     "note": "Retrieval returns the sick leave section; the handbook never mentions bereavement leave."
   },
   {
@@ -163,6 +183,7 @@
     "category": "near_miss",
     "type": "near_miss",
     "question": "How long is the probation period for new hires?",
+    "refusal_reason": "The handbook says new joiners work from the Toronto office for their first two weeks, but it defines no probation period.",
     "note": "Retrieval returns the new joiner onboarding text; no probation period is defined."
   },
   {
@@ -170,6 +191,7 @@
     "category": "near_miss",
     "type": "near_miss",
     "question": "What is the annual budget for attending conferences and training?",
+    "refusal_reason": "The handbook defines travel expense limits and a home office budget, but no conference or training budget.",
     "note": "The handbook has a home office budget and expense limits, but no training budget."
   },
   {
@@ -177,6 +199,7 @@
     "category": "near_miss",
     "type": "near_miss",
     "question": "How many approvals does a database migration need?",
+    "refusal_reason": "The engineering guide requires two approvals for pull requests and hotfixes, but states no approval rule for database migrations.",
     "note": "Pull requests and hotfixes need two approvals; migrations have no stated approval rule."
   }
 ]

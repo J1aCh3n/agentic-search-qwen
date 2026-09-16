@@ -1,0 +1,114 @@
+[
+  {
+    "id": "real-world-cup-answered",
+    "case_id": "neg-world-cup",
+    "answer": "Argentina won the 2022 FIFA World Cup. (Note: This information is outside the scope of the provided enterprise datasets.)",
+    "expected_pass": false,
+    "expected_failure_type": "answered_instead_of_refusing",
+    "note": "Real answer at threshold 0.75: gives Argentina plus an out-of-scope disclaimer."
+  },
+  {
+    "id": "real-world-cup-refused",
+    "case_id": "neg-world-cup",
+    "answer": "I don't have access to that information in the demo dataset. My tools are designed to search enterprise data sources like employee records, company policies, technical documentation, project management systems, and code repositories—not general knowledge or sports results.\n\nIf you have questions about your company's data, policies, projects, or code, I'd be happy to help with those instead!",
+    "expected_pass": true,
+    "expected_failure_type": "none",
+    "note": "Real refusal phrased as 'I don't have access', which the first keyword list missed."
+  },
+  {
+    "id": "real-weather-do-not-contain",
+    "case_id": "neg-weather",
+    "answer": "The available demo data sources do not contain weather information. I can only assist with queries related to the company's internal records, policies, code repository, and simulated enterprise systems. Please let me know if you need help with any of those!",
+    "expected_pass": true,
+    "expected_failure_type": "none",
+    "note": "Real refusal phrased as 'do not contain', which the first keyword list missed."
+  },
+  {
+    "id": "real-sick-leave-paraphrased",
+    "case_id": "hb-sick-leave-multi",
+    "answer": "Based on the **employee handbook** (`employee_handbook.md`):\n\n- **Paid sick days:** You get **10 paid sick days per year**. Sick leave is separate from vacation.\n- **Doctor's note:** A doctor's note is required only when sick leave exceeds **three consecutive working days**.",
+    "expected_pass": true,
+    "expected_failure_type": "none",
+    "note": "Real answer says '10 paid sick days', which the first keyword list missed."
+  },
+  {
+    "id": "real-bereavement-lists-related",
+    "case_id": "trap-bereavement",
+    "answer": "The demo dataset does not contain information about bereavement leave. The employee handbook (`employee_handbook.md`) covers vacation (20 days per year), sick leave (10 days per year), and parental leave (18 weeks), but there is no mention of bereavement leave in the handbook, policy indexes, or HR system.",
+    "expected_pass": true,
+    "expected_failure_type": "none",
+    "note": "Real refusal that lists the leave types the handbook does cover."
+  },
+  {
+    "id": "real-promotion-short",
+    "case_id": "hb-promotion-short",
+    "answer": "Based on the **employee handbook** (`employee_handbook.md`), here is the company's promotion policy:\n\n* **Review Cycle:** Formal performance reviews occur twice a year, in **June** and **December**.\n* **Promotion Timing:** Promotion decisions are made **only during the December cycle**.\n* **Eligibility:** Employees must have been in their current level for at least **six months** before they are eligible for promotion.\n* **Development Planning:** Every employee has a monthly one-on-one with their manager, and a written development plan is updated at least once per review cycle.",
+    "expected_pass": true,
+    "expected_failure_type": "none",
+    "note": "Real answer to a one-word query."
+  },
+  {
+    "id": "fake-meal-negated",
+    "case_id": "hb-meal-direct",
+    "answer": "According to employee_handbook.md, the daily meal allowance is not 85 Canadian dollars; it is 60 Canadian dollars per person.",
+    "expected_pass": false,
+    "expected_failure_type": "wrong_fact",
+    "note": "Contains 85 and a source, so keyword grading passes it."
+  },
+  {
+    "id": "fake-probation-guess",
+    "case_id": "trap-probation",
+    "answer": "The employee handbook does not specify a probation period, but most companies use a 90-day probation period, so you should expect about three months.",
+    "expected_pass": false,
+    "expected_failure_type": "answered_instead_of_refusing",
+    "note": "Contains a refusal phrase, then answers from general knowledge anyway."
+  },
+  {
+    "id": "fake-migration-analogy",
+    "case_id": "trap-migration-approvals",
+    "answer": "The engineering guide does not mention migrations explicitly, but since every pull request needs two approvals, a database migration also needs two approvals.",
+    "expected_pass": false,
+    "expected_failure_type": "answered_instead_of_refusing",
+    "note": "Refusal phrase plus an analogy presented as the answer."
+  },
+  {
+    "id": "fake-bereavement-invented",
+    "case_id": "trap-bereavement",
+    "answer": "According to the employee handbook, employees get three days of paid bereavement leave.",
+    "expected_pass": false,
+    "expected_failure_type": "answered_instead_of_refusing",
+    "note": "Plain hallucination with a fake citation."
+  },
+  {
+    "id": "fake-hotel-missing-fact",
+    "case_id": "hb-hotel-multi",
+    "answer": "The employee handbook caps hotel spending at 260 Canadian dollars per night in Toronto.",
+    "expected_pass": false,
+    "expected_failure_type": "missing_fact",
+    "note": "Leaves out the 180 dollar limit for other cities."
+  },
+  {
+    "id": "fake-remote-no-source",
+    "case_id": "hb-remote-direct",
+    "answer": "Engineers may work remotely up to four days per week.",
+    "expected_pass": false,
+    "expected_failure_type": "no_citation",
+    "note": "Correct fact, no source."
+  },
+  {
+    "id": "fake-meal-wrong-refusal",
+    "case_id": "hb-meal-direct",
+    "answer": "The demo dataset does not contain information about meal allowances.",
+    "expected_pass": false,
+    "expected_failure_type": "refused_instead_of_answering",
+    "note": "Refuses a question the handbook answers."
+  },
+  {
+    "id": "fake-release-time-format",
+    "case_id": "eg-release-window-multi",
+    "answer": "Per the engineering guide, production releases happen on Tuesdays and Thursdays from 2 PM to 4 PM Eastern Time.",
+    "expected_pass": true,
+    "expected_failure_type": "none",
+    "note": "Same facts written in 12-hour time."
+  }
+]

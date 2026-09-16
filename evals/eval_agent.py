@@ -75,6 +75,19 @@ def is_refusal(answer: str) -> bool:
     return any(phrase in answer for phrase in REFUSAL_PHRASES)
 
 
+def grade_keywords(case: dict[str, Any], answer: str) -> dict[str, Any]:
+    """Keyword-based grading, shared with the LLM judge for comparison."""
+    text = normalize(answer)
+    grade: dict[str, Any] = {"refused": is_refusal(text)}
+    if case["type"] == "answerable":
+        grade["answer_correct"] = matches_keywords(text, case["answer_keywords"])
+        grade["source_cited"] = cites_source(text, case["expected_source"])
+        grade["passed"] = grade["answer_correct"] and grade["source_cited"]
+    else:
+        grade["passed"] = grade["refused"]
+    return grade
+
+
 def run_case(agent: LangChainSearchAgent, case: dict[str, Any]) -> dict[str, Any]:
     started = time.perf_counter()
     tool_calls = []
@@ -87,8 +100,7 @@ def run_case(agent: LangChainSearchAgent, case: dict[str, Any]) -> dict[str, Any
             answer = step["final_answer"]
             rounds = step["round"]
 
-    text = normalize(answer)
-    record: dict[str, Any] = {
+    return {
         "id": case["id"],
         "category": case["category"],
         "type": case["type"],
@@ -97,16 +109,8 @@ def run_case(agent: LangChainSearchAgent, case: dict[str, Any]) -> dict[str, Any
         "tool_calls": tool_calls,
         "rounds": rounds,
         "seconds": round(time.perf_counter() - started, 1),
-        "refused": is_refusal(text),
+        **grade_keywords(case, answer),
     }
-
-    if case["type"] == "answerable":
-        record["answer_correct"] = matches_keywords(text, case["answer_keywords"])
-        record["source_cited"] = cites_source(text, case["expected_source"])
-        record["passed"] = record["answer_correct"] and record["source_cited"]
-    else:
-        record["passed"] = record["refused"]
-    return record
 
 
 def failure_reason(record: dict[str, Any]) -> str:

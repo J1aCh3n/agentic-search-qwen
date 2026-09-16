@@ -44,6 +44,7 @@ The repository has been converted to an English-only public demo. The data is sy
 |   +-- keyword_search.py   # Whoosh keyword search
 |   +-- code_search.py      # Sample repository search
 |   +-- enterprise_sdk.py   # Simulated enterprise systems
++-- evals/                  # Golden set, retrieval and end-to-end evaluation, LLM judges (see evals/README.md)
 +-- data/
     +-- docs/               # Markdown source documents that are chunked into the vector store
     +-- code_repo/          # Generated English sample repository
@@ -65,7 +66,7 @@ data/docs/*.md
 Notes on the defaults:
 
 - `chunk_size=500` was chosen by comparing 100, 500, and 2000 on these documents. At 100 characters sentences were split mid-fact; at 2000 characters the distance between relevant and irrelevant results collapsed.
-- `VECTOR_DISTANCE_THRESHOLD=0.65` sits between observed relevant hits (0.33 to 0.48) and unrelated queries (0.70 and above) for this embedding model. Re-calibrate it if the embedding model or the documents change.
+- `VECTOR_DISTANCE_THRESHOLD=0.70` keeps the one-word query `promotion` (0.650 to the correct chunk) while still dropping one-word noise such as `cake` (0.706) and `pizza` (0.734). An earlier value of 0.65 dropped the correct promotion chunk. The margin is thin, so the threshold only filters obvious noise: near-miss questions such as bereavement leave retrieve related chunks at 0.45, and the model, not the threshold, has to recognise that they do not answer the question. Re-calibrate with `evals/` if the embedding model or the documents change.
 
 ## Setup
 
@@ -94,7 +95,7 @@ DASHSCOPE_API_KEY=your_dashscope_api_key_here
 DASHSCOPE_BASE_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1
 DASHSCOPE_MODEL=qwen3.6-plus
 DASHSCOPE_EMBEDDING_MODEL=text-embedding-v4
-VECTOR_DISTANCE_THRESHOLD=0.65
+VECTOR_DISTANCE_THRESHOLD=0.70
 ```
 
 Use the DashScope endpoint that matches the region where the API key was created. This project defaults to the international endpoint because a China-region endpoint can reject an international key with authentication or entitlement errors.
@@ -131,6 +132,22 @@ python seed_data_large.py
 ```
 
 Vectors from one embedding model cannot be searched with another, and `add_documents` skips ids that already exist, so the store has to be deleted before it is rebuilt.
+
+## Evaluation
+
+`evals/` holds a 23-question golden set and evaluates retrieval and final answers separately, with keyword grading and an LLM judge side by side. See [evals/README.md](evals/README.md) for commands and design.
+
+Baseline at `VECTOR_DISTANCE_THRESHOLD=0.70` with `qwen3.6-plus` and `text-embedding-v4`, one run each:
+
+| Evaluation | Result |
+| --- | --- |
+| Retrieval, 15 answerable questions | Hit@1 100%, MRR@3 1.00 |
+| Retrieval, 4 unrelated questions | 4/4 blocked by the threshold |
+| Retrieval, 4 near-miss questions | 0/4 blocked by the threshold, 4/4 judged as not answering the question |
+| End-to-end answers (LLM judge) | 23/23 |
+| Answer judge vs. 14 hand-labelled answers | judge 14/14, keyword grading 11/14 |
+
+The near-miss row is the main finding: related chunks pass any usable threshold, so refusing those questions depends on the model and the system prompt.
 
 ## Example Questions
 
