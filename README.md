@@ -6,6 +6,8 @@ The tool-calling loop is a LangGraph `StateGraph` in `core/graph.py`: a router n
 
 The repository has been converted to an English-only public demo. The data is synthetic and is intended for portfolio review, not production use.
 
+This is the `langgraph` branch, the last of three that show the same assistant rewritten as the tools were learned: `main` runs a hand-written tool-calling loop, `langchain-agent` replaces it with LangChain's `create_agent` and adds real RAG, evaluation and memory, and this branch rebuilds the loop as a LangGraph graph and adds a router node.
+
 ## Features
 
 - Streamlit interface for interactive search and trace inspection
@@ -13,7 +15,7 @@ The repository has been converted to an English-only public demo. The data is sy
 - LangChain tool-calling agent with a Qwen-compatible chat model
 - SQLite search over structured enterprise records
 - Chroma vector search over synthetic company documents, engineering documents, and Markdown source documents
-- Real semantic embeddings from DashScope (`text-embedding-v4`), with a hash-based offline fallback kept for comparison
+- Real semantic embeddings from DashScope (`text-embedding-v4`), replacing the hash-based placeholder the first version used
 - Markdown documents in `data/docs/` are loaded, split into overlapping chunks, and stored with `source` and `chunk_index` metadata
 - Distance threshold on vector results, so an unrelated query returns an explicit "no relevant content" message
 - Source-aware answers: the model is instructed to cite the file, table, collection, index, or system a fact came from
@@ -47,7 +49,7 @@ The repository has been converted to an English-only public demo. The data is sy
 |   +-- logger.py           # Search trace logging
 +-- engines/
 |   +-- database.py         # SQLite search
-|   +-- vector_db.py        # Chroma vector search, embedding functions, distance filtering
+|   +-- vector_db.py        # Chroma vector search, DashScope embeddings, distance filtering
 |   +-- keyword_search.py   # Whoosh keyword search
 |   +-- code_search.py      # Sample repository search
 |   +-- enterprise_sdk.py   # Simulated enterprise systems
