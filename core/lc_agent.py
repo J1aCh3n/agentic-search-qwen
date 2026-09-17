@@ -22,10 +22,11 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.errors import GraphRecursionError
 
 from config import LLM_BASE_URL, LLM_MODEL, MAX_SEARCH_ROUNDS
-from core.agent import SYSTEM_PROMPT, AgenticSearchAgent
 from core.lc_llm import get_chat_model, has_api_key
 from core.lc_tools import build_tools
+from core.local_search import LocalFallbackSearch
 from core.logger import Logger
+from core.prompts import SYSTEM_PROMPT
 from engines.code_search import CodeSearchEngine
 from engines.database import DatabaseEngine
 from engines.enterprise_sdk import EnterpriseSDK
@@ -45,14 +46,14 @@ class LangChainSearchAgent:
     ) -> None:
         """Defaults build the real agent. Tests pass a fake model and tools to run offline."""
         self.logger = Logger()
+        self._local_fallback: LocalFallbackSearch | None = None
         if tools is None:
-            tools = build_tools(
-                DatabaseEngine(),
-                VectorDBEngine(),
-                KeywordSearchEngine(),
-                CodeSearchEngine(),
-                EnterpriseSDK(),
+            db, keyword_search, code_search, enterprise_sdk = (
+                DatabaseEngine(), KeywordSearchEngine(), CodeSearchEngine(), EnterpriseSDK()
             )
+            tools = build_tools(db, VectorDBEngine(), keyword_search, code_search, enterprise_sdk)
+            # The fallback reuses the same engines instead of opening a second set.
+            self._local_fallback = LocalFallbackSearch(db, keyword_search, code_search, enterprise_sdk)
         # This one line replaces the whole hand-written loop in core/agent.py.
         # The checkpointer keeps each conversation's messages under its thread_id.
         self.agent = create_agent(
@@ -87,11 +88,11 @@ class LangChainSearchAgent:
             "system_prompt": SYSTEM_PROMPT,
         }
 
-        # Without a key there is no model to drive the agent, so reuse the old
-        # rule-based fallback search. It is not part of the LangChain lesson.
+        # Without a key there is no model to drive the agent, so fall back to the
+        # rule-based search. It is not part of the LangChain lesson.
         if not has_api_key():
             trace: dict[str, Any] = {}
-            answer = AgenticSearchAgent()._local_search(question, trace)
+            answer = self._fallback().search(question, trace)
             yield {"step": "local_fallback", "round": 0, "trace": trace}
             yield {"step": "final", "round": 0, "final_answer": answer}
             return
@@ -165,6 +166,14 @@ class LangChainSearchAgent:
         final_answer = final_answer or "The model did not return an answer."
         self.logger.log_final_answer(question, final_answer, round_idx)
         yield {"step": "final", "round": round_idx, "final_answer": final_answer, "usage": usage}
+
+    def _fallback(self) -> LocalFallbackSearch:
+        # Agents built with injected tools (tests) create the fallback engines only if needed.
+        if self._local_fallback is None:
+            self._local_fallback = LocalFallbackSearch(
+                DatabaseEngine(), KeywordSearchEngine(), CodeSearchEngine(), EnterpriseSDK()
+            )
+        return self._local_fallback
 
     def _rollback_turn(self, config: dict, messages_before: int) -> None:
         """Remove every message an unfinished turn added, so the thread ends on a complete turn."""

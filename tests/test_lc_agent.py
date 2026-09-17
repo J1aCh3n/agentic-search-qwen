@@ -6,6 +6,7 @@ check memory, rollback, and usage accounting without calling DashScope.
     python -m unittest tests.test_lc_agent
 """
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
@@ -149,6 +150,22 @@ class ConversationMemoryTests(unittest.TestCase):
         final = list(agent.search_stream("question"))[-1]
         self.assertEqual(final["usage"]["model_calls"], 1)
         self.assertEqual(final["usage"]["input_tokens"], 0)
+
+
+class FallbackTests(unittest.TestCase):
+    @patch("core.lc_agent.has_api_key", return_value=False)
+    @patch("core.lc_agent.LocalFallbackSearch")
+    def test_no_api_key_uses_local_fallback_without_the_model(self, fallback_class, _key):
+        fallback_class.return_value.search.return_value = "fallback answer"
+        agent, model = make_agent(reply("never used"))
+        steps = list(agent.search_stream("question"))
+        self.assertEqual([s["step"] for s in steps], ["init", "local_fallback", "final"])
+        self.assertEqual(steps[-1]["final_answer"], "fallback answer")
+        self.assertEqual(model.received, [])
+
+    def test_langchain_agent_does_not_depend_on_the_original_agent(self):
+        source = (Path(__file__).resolve().parents[1] / "core" / "lc_agent.py").read_text(encoding="utf-8")
+        self.assertNotIn("core.agent", source)
 
 
 if __name__ == "__main__":

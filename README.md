@@ -37,7 +37,9 @@ The repository has been converted to an English-only public demo. The data is sy
 |   +-- lc_agent.py         # LangChain agent (create_agent) used by the app and CLI
 |   +-- lc_tools.py         # Tools defined with the @tool decorator
 |   +-- lc_llm.py           # ChatOpenAI client pointed at the DashScope endpoint
-|   +-- agent.py            # Earlier hand-written agent, kept for comparison; holds the system prompt
+|   +-- prompts.py          # System prompt shared by both agents and the UI
+|   +-- local_search.py     # Rule-based fallback search used when no API key is configured
+|   +-- agent.py            # Earlier hand-written agent, kept for comparison
 |   +-- llm.py              # Earlier hand-written OpenAI SDK wrapper, kept for comparison
 |   +-- logger.py           # Search trace logging
 +-- engines/

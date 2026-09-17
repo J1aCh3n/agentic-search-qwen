@@ -7,8 +7,8 @@ from typing import Any
 import streamlit as st
 
 from config import EMBEDDING_MODEL, LLM_MODEL, MAX_SEARCH_ROUNDS, VECTOR_DISTANCE_THRESHOLD
-from core.agent import SYSTEM_PROMPT
 from core.lc_agent import LangChainSearchAgent
+from core.prompts import SYSTEM_PROMPT
 from seed_data_large import ensure_seed_data
 
 st.set_page_config(page_title="Agentic search", page_icon=":material/travel_explore:", layout="wide")
