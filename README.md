@@ -2,7 +2,7 @@
 
 Agentic Search Qwen is a Streamlit demo of an enterprise search assistant that uses a Qwen-compatible chat model to choose tools, retrieve evidence, and answer questions over multiple synthetic data sources.
 
-The tool-calling loop is a LangGraph `StateGraph` in `core/graph.py`: a model node, a tool node, and a conditional edge that runs tools while the model asks for them. It started as LangChain's `create_agent` and was rebuilt by hand so that extra nodes can be added; the rebuilt graph sends the model the same request, which was checked by comparing the outgoing payloads. Retrieval is real RAG: documents are chunked, embedded with a DashScope embedding model, and filtered by a distance threshold so that irrelevant results are reported as missing evidence instead of being answered from general knowledge.
+The tool-calling loop is a LangGraph `StateGraph` in `core/graph.py`: a router node, a model node, a tool node, and a conditional edge that runs tools while the model asks for them. It started as LangChain's `create_agent` and was rebuilt by hand so that extra nodes could be added; the rebuilt graph sent the model the same request, which was checked by comparing the outgoing payloads. The router node is the first thing that was added: it classifies the question and the model node then sends only that group's tool descriptions, which cuts the tokens every call repeats. Retrieval is real RAG: documents are chunked, embedded with a DashScope embedding model, and filtered by a distance threshold so that irrelevant results are reported as missing evidence instead of being answered from general knowledge.
 
 The repository has been converted to an English-only public demo. The data is synthetic and is intended for portfolio review, not production use.
 
@@ -23,7 +23,8 @@ The repository has been converted to an English-only public demo. The data is sy
 - Explicit API error reporting when model credentials, region, or entitlement are wrong
 - Local fallback search only when no model API key is configured
 - Conversation memory: a LangGraph checkpointer keeps each conversation under its own `thread_id`, so follow-up questions such as "Is that per person?" work; a turn that fails midway is rolled back so it cannot corrupt later turns
-- Chat interface with a collapsible search trace per answer, showing tool calls, retrieved text, and token usage
+- Chat interface with a collapsible search trace per answer, showing the chosen tool group, tool calls, retrieved text, and token usage
+- Question router: one cheap classification call per turn decides which tool group the model is shown, instead of resending all eight tool descriptions on every call
 
 ## Project Structure
 
@@ -35,7 +36,8 @@ The repository has been converted to an English-only public demo. The data is sy
 +-- seed_data_large.py      # English synthetic data generator, including document chunking
 +-- core/
 |   +-- lc_agent.py         # Agent used by the app and CLI: runs the graph, streams steps, rolls back failed turns
-|   +-- graph.py            # LangGraph StateGraph: model node, tools node, conditional edge
+|   +-- graph.py            # LangGraph StateGraph: router node, model node, tools node, conditional edge
+|   +-- router.py           # Classifies a question and maps the category to a tool group
 |   +-- lc_tools.py         # Tools defined with the @tool decorator
 |   +-- lc_llm.py           # ChatOpenAI client pointed at the DashScope endpoint
 |   +-- prompts.py          # System prompt shared by both agents and the UI
@@ -129,7 +131,7 @@ The CLI keeps one conversation for the whole session; type `new` to start anothe
 Offline tests (no API calls; a fake model stands in for Qwen):
 
 ```powershell
-python -m unittest tests.test_lc_agent evals.test_eval_retrieval_judge evals.test_judge_answers evals.test_eval_conversations
+python -m unittest tests.test_lc_agent evals.test_eval_retrieval_judge evals.test_judge_answers evals.test_eval_conversations evals.test_eval_runs
 ```
 
 Force-regenerate demo data:
@@ -174,7 +176,27 @@ Multi-turn baseline with conversation memory, agent `qwen3.6-plus-2026-04-02`, o
 | Tokens for 17 turns | 64,101 input, 3,934 output, about 4,000 per turn |
 | Average context size by turn | turn 1: 2,528, turn 2: 2,840, turn 3: 2,641 |
 
-About 1,650 tokens of every model call are the system prompt and tool definitions, so in short conversations that fixed cost is larger than the retrieval results.
+About 1,650 tokens of every model call are the system prompt and tool definitions, so in short conversations that fixed cost is larger than the retrieval results. The measured parts are the system prompt (478 tokens) and the eight tool descriptions (968 tokens), and they are resent on every call of every turn. That is what the question router addresses.
+
+### Question router
+
+`core/router.py` spends one small classification call per turn (the question and four category names, no tool descriptions, about 430 tokens) and the model node then sends only that category's tools: `docs` 307 tokens, `code` 283, `records` 464, or all 968 for `unknown`. Routing can be wrong, so `unknown` keeps every tool, and a failed or unparsable routing call falls back to it.
+
+Both arms were run in the same session on `qwen3.6-flash-2026-04-16`, because the free quota of the earlier agent model ran out and a baseline measured on a different model would not be comparable. `--no-router` reproduces the agent before the router.
+
+| Evaluation | Without the router | With the router |
+| --- | --- | --- |
+| 23 questions, LLM judge | 21/23 | 20/23 |
+| 23 questions, keyword grading | 22/23 | 22/23 |
+| 23 questions, input tokens | 133,238 | 85,320 (-36%) |
+| 23 questions, average rounds | 2.3 | 2.1 |
+| 8 conversations, LLM judge | 8/8 | 7/8 |
+| 17 turns, input tokens | 72,908 | 57,134 (-22%) |
+| First-turn context | 2,616 | 1,737 (-34%) |
+
+The saving is net of the router's own cost, which is counted in the input tokens above (9,919 tokens for 23 questions). Routing was correct on every question: 19 document questions took the `docs` branch and the 4 unrelated ones took `unknown`.
+
+The accuracy difference is one case on each evaluation and is within the noise of a single run. No failure was caused by a missing tool: the router arm lost two cases by not naming the source document although the facts were right, both arms failed the database migration question, which has been unstable since it was written, and one case in each arm was failed by the judge for saying the engineering guide is part of the employee handbook. Conversations save less because a follow-up such as "Is that per person?" names no topic, so it routes to `unknown` and keeps every tool.
 
 The answer judge checks every claim against the text sources the agent can search: the Markdown documents, vector collections, keyword indexes, and wiki. An earlier version saw only the reference answer, so it could not tell whether an extra detail was true: it failed correct answers that added real rules (the client entertainment approval rule, the 90-day home office receipt deadline, and the two-day rule in the keyword policy index), and one unchanged answer passed in one grading run and failed in the next. With the source text, those answers pass, and invented extra details and misstated related facts fail.
 

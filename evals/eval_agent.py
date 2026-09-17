@@ -9,9 +9,11 @@ failed cases can be inspected afterwards.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import time
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -93,6 +95,7 @@ def run_case(agent: LangChainSearchAgent, case: dict[str, Any]) -> dict[str, Any
     tool_calls = []
     answer = ""
     rounds = 0
+    route = ""
     usage: dict[str, int] = {}
     for step in agent.search_stream(case["question"]):
         if step["step"] == "tool_call":
@@ -100,6 +103,7 @@ def run_case(agent: LangChainSearchAgent, case: dict[str, Any]) -> dict[str, Any
         elif step["step"] == "final":
             answer = step["final_answer"]
             rounds = step["round"]
+            route = step.get("route", "")
             usage = step.get("usage", {})
 
     return {
@@ -110,10 +114,20 @@ def run_case(agent: LangChainSearchAgent, case: dict[str, Any]) -> dict[str, Any
         "answer": answer,
         "tool_calls": tool_calls,
         "rounds": rounds,
+        "route": route,
         "seconds": round(time.perf_counter() - started, 1),
         "usage": usage,
         **grade_keywords(case, answer),
     }
+
+
+def build_agent(route: bool) -> LangChainSearchAgent:
+    """route=False reproduces the agent before the router: every question sees all tools."""
+    if route:
+        return LangChainSearchAgent()
+    return LangChainSearchAgent(
+        router=lambda question: {"category": "unknown", "input_tokens": 0, "output_tokens": 0}
+    )
 
 
 def failure_reason(record: dict[str, Any]) -> str:
@@ -150,12 +164,19 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, str]:
         "total_seconds": f"{sum(r['seconds'] for r in records):.0f}",
         "input_tokens": str(sum(r["usage"].get("input_tokens", 0) for r in records)),
         "output_tokens": str(sum(r["usage"].get("output_tokens", 0) for r in records)),
+        "router_tokens": str(sum(r["usage"].get("router_tokens", 0) for r in records)),
+        # Which branch each question took, so a new failure can be traced to a wrong route.
+        "routes": json.dumps(dict(Counter(r["route"] for r in records))),
     }
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="End-to-end evaluation on the golden set.")
+    parser.add_argument("--no-router", action="store_true", help="show every tool on every call")
+    args = parser.parse_args()
+
     cases = json.loads(GOLDEN_SET.read_text(encoding="utf-8"))
-    agent = LangChainSearchAgent()
+    agent = build_agent(route=not args.no_router)
     records = []
 
     for index, case in enumerate(cases, start=1):
@@ -165,7 +186,7 @@ def main() -> None:
         reason = failure_reason(record)
         print(
             f"[{index:2d}/{len(cases)}] {status} {case['id']:28s} "
-            f"rounds={record['rounds']} {record['seconds']:5.1f}s"
+            f"rounds={record['rounds']} route={record['route']:8s} {record['seconds']:5.1f}s"
             + (f"  <- {reason}" if reason else ""),
             flush=True,
         )
@@ -175,6 +196,7 @@ def main() -> None:
         "llm_model": LLM_MODEL,
         "embedding_model": EMBEDDING_MODEL,
         "vector_distance_threshold": VECTOR_DISTANCE_THRESHOLD,
+        "router": not args.no_router,
     }
 
     print("\nConfig:", json.dumps(config))
@@ -182,7 +204,8 @@ def main() -> None:
         print(f"  {key:18s} {value}")
 
     RESULTS_DIR.mkdir(exist_ok=True)
-    output = RESULTS_DIR / f"{datetime.now():%Y%m%d-%H%M%S}-threshold-{VECTOR_DISTANCE_THRESHOLD}.json"
+    suffix = "" if config["router"] else "-norouter"
+    output = RESULTS_DIR / f"{datetime.now():%Y%m%d-%H%M%S}-threshold-{VECTOR_DISTANCE_THRESHOLD}{suffix}.json"
     output.write_text(
         json.dumps({"config": config, "summary": summary, "cases": records}, indent=2, ensure_ascii=False),
         encoding="utf-8",

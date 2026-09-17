@@ -9,7 +9,7 @@ Run every command from the project root with the project's Python environment.
 | `golden_set.json` | 23 questions: 15 answerable (direct, paraphrase, multi-fact, short), 4 unrelated, 4 near-miss |
 | `eval_retrieval.py` | Retrieval layer, keyword check. Embeddings only, no chat model |
 | `eval_retrieval_judge.py` | Retrieval layer, LLM judge decides whether each retrieved chunk answers the question |
-| `eval_agent.py` | End-to-end: runs the full agent, keyword grading, saves every answer to `results/` |
+| `eval_agent.py` | End-to-end: runs the full agent, keyword grading, saves every answer to `results/`. `--no-router` shows every tool on every call, which is the arm to compare the router against |
 | `golden_conversations.json` | 8 multi-turn conversations (17 turns): pronoun and ellipsis follow-ups, follow-ups asking for a new fact, a three-turn chain, a topic switch, and near-miss and unrelated follow-ups |
 | `eval_conversations.py` | Multi-turn: one thread per conversation, grades the last turn, records per-turn tokens and whether follow-ups searched again |
 | `judge_answers.py` | LLM judge for the answers saved by `eval_agent.py`, with a calibration mode |
@@ -23,11 +23,13 @@ Run every command from the project root with the project's Python environment.
 python -m evals.eval_retrieval               # fast, near-free
 python -m evals.eval_retrieval_judge         # one chat call per question with surviving chunks
 python -m evals.eval_agent                   # slow: 23 full agent runs
+python -m evals.eval_agent --no-router       # same, with every tool on every call (router baseline)
 python -m evals.eval_conversations --limit 1 # one conversation first, to check token cost
 python -m evals.eval_conversations           # all conversations; grade with judge_answers PATH
+python -m evals.eval_conversations --no-router  # conversation baseline without the router
 python -m evals.judge_answers --calibrate    # check the answer judge against human labels
 python -m evals.judge_answers                # judge the latest eval_agent result
-python -m unittest tests.test_lc_agent evals.test_eval_retrieval_judge evals.test_judge_answers evals.test_eval_conversations
+python -m unittest tests.test_lc_agent evals.test_eval_retrieval_judge evals.test_judge_answers evals.test_eval_conversations evals.test_eval_runs
 ```
 
 ## Design
@@ -53,6 +55,8 @@ python -m unittest tests.test_lc_agent evals.test_eval_retrieval_judge evals.tes
 
 **The answer judge checks claims against the source text, not only the reference.** A reference answer lists the key facts, but an agent answer often adds other true details. A judge that saw only the reference had to guess whether those details were real: it failed correct answers that added real rules, and graded one unchanged answer differently on two runs. The judge now receives every text source the agent can search (`data/docs/`, the vector collections, the keyword indexes, and the wiki system, about 2,500 tokens) and fails any claim about the company that no source states. Giving it only `data/docs/` was not enough: an answer quoting the two-day remote work rule from the keyword policy index was called a hallucination. Structured records (SQLite and the HR, finance, and project systems) are not included, so an answer that cites them would show up as a disagreement for a human to check.
 
+**The router is measured by running both arms on the same model.** The question router picks a tool group, so a question that is routed wrongly loses the tool it needed. `--no-router` reproduces the agent as it was before the router, and the two runs are compared question by question. Both arms have to run on the same model in the same session: an old baseline from a different model id proves nothing, and DashScope free quota is per model id, so the model a baseline was measured on can become unavailable. Every result file records `"router": true|false` and every case records the branch it took, so a new failure can be traced to its route.
+
 **Calibrate the judge before trusting it.** `judge_calibration.json` mixes real agent answers with answers written to fool keyword grading. The first judge prompt passed an answer with no citation, reasoning that a simple fact did not need one; calibration caught it and the rubric now lists every pass condition explicitly. Add a fixture whenever you find a new misjudgement. Leave out answers whose correct label is debatable.
 
 **The judge model is separate from the agent model.** `DASHSCOPE_JUDGE_MODEL` defaults to `qwen3.7-plus-2026-05-26` while the agent uses `qwen3.6-plus-2026-04-02`. Both are dated snapshots. A dated snapshot keeps scores comparable, because an alias such as `qwen3.7-plus` can be moved to a newer model. A different model generation reduces self-preference, and DashScope free quota is per model, so judging does not spend the agent's quota. Calibration results for the models tried:
@@ -76,6 +80,7 @@ A failure that produces no verdict is visible as `judge_error`; a wrong verdict 
 - Failure types for borderline answers can still vary between runs. `fake-conv-per-person-wrong-referent` fails in every run, but was labelled `missing_fact` in one run and `wrong_fact` in the next.
 - The judge does not see structured records, so answers built on SQLite or the enterprise systems cannot be checked for unsupported details.
 - The judge and the agent are different generations of the same Qwen family, so correlated mistakes are still possible. A judge from another model family would be a stronger check.
-- Every configuration has been run once. The agent is not deterministic, so a one-case difference between runs can be noise.
+- Every configuration has been run once. The agent is not deterministic, so a one-case difference between runs can be noise. This is the main limitation of the router comparison below: its one-case difference is not evidence of a regression.
+- The golden set only asks document questions, so the router's `code` and `records` branches are not measured by it.
 - Unrelated questions are full sentences that the agent refuses without searching, so they do not measure the distance threshold. Short noisy queries such as `cake` would.
 - Questions and retrieved text are sent to DashScope.

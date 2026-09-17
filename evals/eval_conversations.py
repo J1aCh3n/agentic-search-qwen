@@ -20,8 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from config import EMBEDDING_MODEL, LLM_MODEL, VECTOR_DISTANCE_THRESHOLD
-from core.lc_agent import LangChainSearchAgent
-from evals.eval_agent import RESULTS_DIR, grade_keywords
+from evals.eval_agent import RESULTS_DIR, build_agent, grade_keywords
 
 CONVERSATIONS = Path(__file__).parent / "golden_conversations.json"
 
@@ -43,6 +42,7 @@ def run_turn(agent: Any, question: str, thread_id: str) -> dict[str, Any]:
         elif step["step"] == "final":
             turn["answer"] = step["final_answer"]
             turn["rounds"] = step["round"]
+            turn["route"] = step.get("route", "")
             turn["usage"] = step.get("usage", {})
     turn["seconds"] = round(time.perf_counter() - started, 1)
     return turn
@@ -93,16 +93,18 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Multi-turn conversation evaluation.")
     parser.add_argument("--limit", type=int, help="run only the first N conversations")
+    parser.add_argument("--no-router", action="store_true", help="show every tool on every call")
     args = parser.parse_args()
 
     conversations = load_conversations()[: args.limit]
-    agent = LangChainSearchAgent()
+    agent = build_agent(route=not args.no_router)
     records = []
     for index, conversation in enumerate(conversations, start=1):
         record = run_conversation(agent, conversation)
         records.append(record)
         turn_notes = " | ".join(
-            f"t{n}: calls={t.get('usage', {}).get('model_calls', 0)} ctx={t.get('usage', {}).get('context_tokens', 0)}"
+            f"t{n}: calls={t.get('usage', {}).get('model_calls', 0)} "
+            f"ctx={t.get('usage', {}).get('context_tokens', 0)} route={t.get('route', '')}"
             + (" ERROR" if t["error"] else "")
             for n, t in enumerate(record["turns"], start=1)
         )
@@ -114,13 +116,16 @@ def main() -> None:
         "llm_model": LLM_MODEL,
         "embedding_model": EMBEDDING_MODEL,
         "vector_distance_threshold": VECTOR_DISTANCE_THRESHOLD,
+        "router": not args.no_router,
     }
     print("\nConfig:", json.dumps(config))
     for key, value in summary.items():
         print(f"  {key:30s} {value}")
 
     RESULTS_DIR.mkdir(exist_ok=True)
-    output = RESULTS_DIR / f"{datetime.now():%Y%m%d-%H%M%S}-conversations-threshold-{VECTOR_DISTANCE_THRESHOLD}.json"
+    suffix = "" if config["router"] else "-norouter"
+    output = (RESULTS_DIR /
+              f"{datetime.now():%Y%m%d-%H%M%S}-conversations-threshold-{VECTOR_DISTANCE_THRESHOLD}{suffix}.json")
     output.write_text(
         json.dumps({"config": config, "summary": summary, "cases": records}, indent=2, ensure_ascii=False),
         encoding="utf-8",
