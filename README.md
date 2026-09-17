@@ -22,6 +22,8 @@ The repository has been converted to an English-only public demo. The data is sy
 - Simulated enterprise systems for HR, finance, project management, and wiki queries
 - Explicit API error reporting when model credentials, region, or entitlement are wrong
 - Local fallback search only when no model API key is configured
+- Conversation memory: a LangGraph checkpointer keeps each conversation under its own `thread_id`, so follow-up questions such as "Is that per person?" work; a turn that fails midway is rolled back so it cannot corrupt later turns
+- Chat interface with a collapsible search trace per answer, showing tool calls, retrieved text, and token usage
 
 ## Project Structure
 
@@ -93,7 +95,7 @@ Edit `.env` and add your DashScope API key:
 ```text
 DASHSCOPE_API_KEY=your_dashscope_api_key_here
 DASHSCOPE_BASE_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1
-DASHSCOPE_MODEL=qwen3.6-plus
+DASHSCOPE_MODEL=qwen3.6-plus-2026-04-02
 DASHSCOPE_EMBEDDING_MODEL=text-embedding-v4
 DASHSCOPE_JUDGE_MODEL=qwen3.7-plus-2026-05-26
 VECTOR_DISTANCE_THRESHOLD=0.70
@@ -117,6 +119,14 @@ CLI:
 
 ```powershell
 python main.py
+```
+
+The CLI keeps one conversation for the whole session; type `new` to start another. In Streamlit, each browser tab has its own conversation and the sidebar button starts a new one.
+
+Offline tests (no API calls; a fake model stands in for Qwen):
+
+```powershell
+python -m unittest tests.test_lc_agent evals.test_eval_retrieval_judge evals.test_judge_answers evals.test_eval_conversations
 ```
 
 Force-regenerate demo data:
@@ -146,9 +156,23 @@ Baseline at `VECTOR_DISTANCE_THRESHOLD=0.70` with `qwen3.6-plus` and `text-embed
 | Retrieval, 4 unrelated questions | 4/4 blocked by the threshold |
 | Retrieval, 4 near-miss questions | 0/4 blocked by the threshold, 4/4 judged as not answering the question |
 | End-to-end answers (LLM judge) | 23/23 |
-| Answer judge vs. 14 hand-labelled answers | `qwen3.7-plus-2026-05-26` 14/14 in two runs, keyword grading 11/14 |
+| Regression after switching the agent to `qwen3.6-plus-2026-04-02` and adding memory | keyword grading 23/23; judge 22/23, and the one failure is a judge error (see below); 130,185 input and 9,730 output tokens |
+| Answer judge vs. 17 hand-labelled answers, including 3 follow-ups | `qwen3.7-plus-2026-05-26` 17/17, keyword grading 12/17 |
 
 The near-miss row is the main finding: related chunks pass any usable threshold, so refusing those questions depends on the model and the system prompt.
+
+Multi-turn baseline with conversation memory, agent `qwen3.6-plus-2026-04-02`, one run:
+
+| Evaluation | Result |
+| --- | --- |
+| 8 conversations, last turn graded (LLM judge) | 8/8 |
+| Follow-up turns that searched again | 2/9 (a topic switch and a near-miss); the rest answered from retrieval results kept in memory |
+| Tokens for 17 turns | 64,101 input, 3,934 output, about 4,000 per turn |
+| Average context size by turn | turn 1: 2,528, turn 2: 2,840, turn 3: 2,641 |
+
+About 1,650 tokens of every model call are the system prompt and tool definitions, so in short conversations that fixed cost is larger than the retrieval results.
+
+Known judge limitation: the answer judge sees the reference answer but not the source document, so it cannot tell whether an extra detail in an answer is true. In the regression run it failed two correct answers that added real handbook rules (the client entertainment approval rule and the 90-day receipt deadline for the home office budget), and the same answer passed in one grading run and failed in the next. Disagreements with keyword grading are listed by `judge_answers.py` and were checked by hand against the handbook.
 
 ## Example Questions
 

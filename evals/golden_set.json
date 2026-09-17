@@ -23,9 +23,9 @@
     "type": "answerable",
     "question": "When does an expense need manager approval before the money is spent?",
     "expected_source": "employee_handbook.md",
-    "reference_answer": "Any single expense above 1,000 Canadian dollars requires manager approval before the money is spent.",
+    "reference_answer": "Any single expense above 1,000 Canadian dollars requires manager approval before the money is spent. Client entertainment always requires prior approval regardless of amount.",
     "answer_keywords": [["1,000", "1000"]],
-    "note": "The handbook writes 1,000 with a comma, so both spellings must be accepted."
+    "note": "The handbook writes 1,000 with a comma, so both spellings must be accepted. The client entertainment rule was added to the reference after the judge failed a correct answer that mentioned it: the judge treats the reference as the complete list of facts."
   },
   {
     "id": "eg-approvals-direct",

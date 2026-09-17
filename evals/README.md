@@ -10,6 +10,8 @@ Run every command from the project root with the project's Python environment.
 | `eval_retrieval.py` | Retrieval layer, keyword check. Embeddings only, no chat model |
 | `eval_retrieval_judge.py` | Retrieval layer, LLM judge decides whether each retrieved chunk answers the question |
 | `eval_agent.py` | End-to-end: runs the full agent, keyword grading, saves every answer to `results/` |
+| `golden_conversations.json` | 8 multi-turn conversations (17 turns): pronoun and ellipsis follow-ups, follow-ups asking for a new fact, a three-turn chain, a topic switch, and near-miss and unrelated follow-ups |
+| `eval_conversations.py` | Multi-turn: one thread per conversation, grades the last turn, records per-turn tokens and whether follow-ups searched again |
 | `judge_answers.py` | LLM judge for the answers saved by `eval_agent.py`, with a calibration mode |
 | `judge_calibration.json` | 14 hand-labelled answers used to check the answer judge |
 | `judge_model.py` | Judge model setup and retry, shared by both judges |
@@ -21,9 +23,11 @@ Run every command from the project root with the project's Python environment.
 python -m evals.eval_retrieval               # fast, near-free
 python -m evals.eval_retrieval_judge         # one chat call per question with surviving chunks
 python -m evals.eval_agent                   # slow: 23 full agent runs
+python -m evals.eval_conversations --limit 1 # one conversation first, to check token cost
+python -m evals.eval_conversations           # all conversations; grade with judge_answers PATH
 python -m evals.judge_answers --calibrate    # check the answer judge against human labels
 python -m evals.judge_answers                # judge the latest eval_agent result
-python -m unittest evals.test_eval_retrieval_judge evals.test_judge_answers
+python -m unittest tests.test_lc_agent evals.test_eval_retrieval_judge evals.test_judge_answers evals.test_eval_conversations
 ```
 
 ## Design
@@ -49,7 +53,7 @@ python -m unittest evals.test_eval_retrieval_judge evals.test_judge_answers
 
 **Calibrate the judge before trusting it.** `judge_calibration.json` mixes real agent answers with answers written to fool keyword grading. The first judge prompt passed an answer with no citation, reasoning that a simple fact did not need one; calibration caught it and the rubric now lists every pass condition explicitly. Add a fixture whenever you find a new misjudgement. Leave out answers whose correct label is debatable.
 
-**The judge model is separate from the agent model.** `DASHSCOPE_JUDGE_MODEL` defaults to `qwen3.7-plus-2026-05-26` while the agent uses `qwen3.6-plus`. A dated snapshot keeps scores comparable, because an alias such as `qwen3.7-plus` can be moved to a newer model. A different model generation reduces self-preference, and DashScope free quota is per model, so judging does not spend the agent's quota. Calibration results for the models tried:
+**The judge model is separate from the agent model.** `DASHSCOPE_JUDGE_MODEL` defaults to `qwen3.7-plus-2026-05-26` while the agent uses `qwen3.6-plus-2026-04-02`. Both are dated snapshots. A dated snapshot keeps scores comparable, because an alias such as `qwen3.7-plus` can be moved to a newer model. A different model generation reduces self-preference, and DashScope free quota is per model, so judging does not spend the agent's quota. Calibration results for the models tried:
 
 | Judge model | Agrees with labels | Notes |
 | --- | --- | --- |

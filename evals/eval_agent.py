@@ -93,12 +93,14 @@ def run_case(agent: LangChainSearchAgent, case: dict[str, Any]) -> dict[str, Any
     tool_calls = []
     answer = ""
     rounds = 0
+    usage: dict[str, int] = {}
     for step in agent.search_stream(case["question"]):
         if step["step"] == "tool_call":
             tool_calls.append({"tool": step["tool_name"], "arguments": step["arguments"]})
         elif step["step"] == "final":
             answer = step["final_answer"]
             rounds = step["round"]
+            usage = step.get("usage", {})
 
     return {
         "id": case["id"],
@@ -109,6 +111,7 @@ def run_case(agent: LangChainSearchAgent, case: dict[str, Any]) -> dict[str, Any
         "tool_calls": tool_calls,
         "rounds": rounds,
         "seconds": round(time.perf_counter() - started, 1),
+        "usage": usage,
         **grade_keywords(case, answer),
     }
 
@@ -145,6 +148,8 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, str]:
         "near_miss_refusal": rate(near_miss, "passed"),
         "avg_rounds": f"{sum(r['rounds'] for r in records) / len(records):.1f}",
         "total_seconds": f"{sum(r['seconds'] for r in records):.0f}",
+        "input_tokens": str(sum(r["usage"].get("input_tokens", 0) for r in records)),
+        "output_tokens": str(sum(r["usage"].get("output_tokens", 0) for r in records)),
     }
 
 

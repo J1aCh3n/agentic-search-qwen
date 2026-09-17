@@ -1,0 +1,103 @@
+[
+  {
+    "id": "conv-meal-per-person",
+    "category": "pronoun_follow_up",
+    "type": "answerable",
+    "turns": [
+      "How much can I spend on meals per day when travelling?",
+      "Is that per person?"
+    ],
+    "expected_source": "employee_handbook.md",
+    "reference_answer": "Yes. The daily meal allowance of 85 Canadian dollars is per person.",
+    "answer_keywords": [["per person"]],
+    "note": "'that' only makes sense with the first turn."
+  },
+  {
+    "id": "conv-hotel-other-cities",
+    "category": "ellipsis_follow_up",
+    "type": "answerable",
+    "turns": [
+      "What is the hotel limit in Toronto?",
+      "And in other cities?"
+    ],
+    "expected_source": "employee_handbook.md",
+    "reference_answer": "Outside Toronto, Vancouver, and New York, hotel spending is capped at 180 Canadian dollars per night.",
+    "answer_keywords": [["180"]],
+    "note": "The follow-up omits the topic entirely."
+  },
+  {
+    "id": "conv-hotfix-during-freeze",
+    "category": "follow_up_new_fact",
+    "type": "answerable",
+    "turns": [
+      "On which days are production releases deployed?",
+      "Can we still ship a hotfix during the quarter-end freeze?"
+    ],
+    "expected_source": "engineering_guide.md",
+    "reference_answer": "Yes. Hotfixes are exempt from the release freeze, but they still need two approvals.",
+    "answer_keywords": [["exempt", "allowed", "permitted"], ["two approvals", "2 approvals"]],
+    "note": "The first answer never mentions hotfixes, but the retrieved release-process chunk does, so the agent answers from memory. If old tool results are cleared, it has to search again."
+  },
+  {
+    "id": "conv-promotion-time-in-level",
+    "category": "follow_up_new_fact",
+    "type": "answerable",
+    "turns": [
+      "When are promotion decisions made?",
+      "How long do I need to be at my current level before that?"
+    ],
+    "expected_source": "employee_handbook.md",
+    "reference_answer": "Employees need at least six months in their current level before they are eligible for promotion.",
+    "answer_keywords": [["six months", "6 months"]],
+    "note": "'that' refers to promotion. The six-month rule is in the chunk retrieved for the first turn, so the agent answers from memory. If old tool results are cleared, it has to search again."
+  },
+  {
+    "id": "conv-on-call-three-turns",
+    "category": "multi_turn_chain",
+    "type": "answerable",
+    "turns": [
+      "How long is an on-call rotation?",
+      "Which day does it start?",
+      "At what time?"
+    ],
+    "expected_source": "engineering_guide.md",
+    "reference_answer": "The on-call rotation starts at 10:00 Eastern Time on Monday.",
+    "answer_keywords": [["10:00", "10 am", "10:00 am"]],
+    "note": "The last turn depends on both earlier turns."
+  },
+  {
+    "id": "conv-topic-switch",
+    "category": "topic_switch",
+    "type": "answerable",
+    "turns": [
+      "How large can a pull request be before it is sent back for splitting?",
+      "How many days per week can engineers work remotely?"
+    ],
+    "expected_source": "employee_handbook.md",
+    "reference_answer": "Engineers may work remotely up to four days per week.",
+    "answer_keywords": [["four days", "4 days"]],
+    "note": "The second question is unrelated to the first; earlier context must not leak into the answer."
+  },
+  {
+    "id": "conv-bereavement-after-sick-leave",
+    "category": "near_miss_follow_up",
+    "type": "near_miss",
+    "turns": [
+      "How many paid sick days do we get?",
+      "And bereavement leave?"
+    ],
+    "refusal_reason": "The employee handbook covers vacation, sick leave, and parental leave, but does not define bereavement leave.",
+    "note": "The sick leave answer is still in memory and invites an analogy."
+  },
+  {
+    "id": "conv-vacation-destination",
+    "category": "unrelated_follow_up",
+    "type": "unrelated",
+    "turns": [
+      "How much paid vacation do I get each year?",
+      "Nice, where in Europe should I spend it?"
+    ],
+    "refusal_reason": "The dataset only covers internal company records, policies, engineering documents, and code. It contains no travel recommendations.",
+    "note": "A friendly follow-up that invites a general-knowledge answer."
+  }
+]

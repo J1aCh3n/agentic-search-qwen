@@ -110,5 +110,29 @@
     "expected_pass": true,
     "expected_failure_type": "none",
     "note": "Same facts written in 12-hour time."
+  },
+  {
+    "id": "fake-conv-per-person-correct",
+    "case_id": "conv-meal-per-person",
+    "answer": "Yes. According to the employee handbook, the 85 Canadian dollar daily meal allowance is per person.",
+    "expected_pass": true,
+    "expected_failure_type": "none",
+    "note": "Correctly resolves 'that' to the meal allowance from the first turn."
+  },
+  {
+    "id": "fake-conv-per-person-wrong-referent",
+    "case_id": "conv-meal-per-person",
+    "answer": "Yes. The employee handbook says the 260 Canadian dollar Toronto hotel cap applies per person per night.",
+    "expected_pass": false,
+    "expected_failure_type": "missing_fact",
+    "note": "Resolves 'that' to the wrong policy. It contains 'per person' and a source, so keyword grading passes it. First labelled wrong_fact; the rubric defines wrong_fact as contradicting the reference, and this answer never mentions the meal allowance, so missing_fact is the label the rubric implies. The rubric has no category for an extra unsupported claim such as the hotel cap being per person."
+  },
+  {
+    "id": "fake-conv-europe-answered",
+    "case_id": "conv-vacation-destination",
+    "answer": "The employee handbook does not cover travel advice, but with twenty days off, Lisbon and Prague are affordable choices.",
+    "expected_pass": false,
+    "expected_failure_type": "answered_instead_of_refusing",
+    "note": "Refusal phrase followed by a general-knowledge recommendation. Keyword grading passes it."
   }
 ]

@@ -1,200 +1,180 @@
 from __future__ import annotations
 
 import json
+import uuid
+from typing import Any
 
 import streamlit as st
 
+from config import EMBEDDING_MODEL, LLM_MODEL, MAX_SEARCH_ROUNDS, VECTOR_DISTANCE_THRESHOLD
+from core.agent import SYSTEM_PROMPT
 from core.lc_agent import LangChainSearchAgent
 from seed_data_large import ensure_seed_data
 
+st.set_page_config(page_title="Agentic search", page_icon=":material/travel_explore:", layout="wide")
 
-st.set_page_config(
-    page_title="Agentic Search",
-    page_icon="Search",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-st.markdown(
-    """
-<style>
-    .main-header {
-        font-size: 2.2rem;
-        font-weight: 700;
-        color: #1f2937;
-        margin-bottom: 0.2rem;
-    }
-    .sub-header {
-        font-size: 1.05rem;
-        color: #4b5563;
-        margin-bottom: 1.4rem;
-    }
-    .trace-label {
-        display: inline-block;
-        padding: 0.2rem 0.5rem;
-        border-radius: 0.35rem;
-        font-weight: 600;
-    }
-    .trace-prompt { background: #e0f2fe; color: #075985; }
-    .trace-tool { background: #fef3c7; color: #92400e; }
-    .trace-final { background: #dcfce7; color: #166534; }
-    .source-badge {
-        display: inline-block;
-        padding: 0.25rem 0.55rem;
-        margin: 0.15rem;
-        border-radius: 0.35rem;
-        background: #eef2ff;
-        color: #3730a3;
-        font-size: 0.85rem;
-    }
-</style>
-""",
-    unsafe_allow_html=True,
-)
+SUGGESTIONS = {
+    ":material/restaurant: Daily meal allowance": "How much can I spend on meals per day when travelling?",
+    ":material/rocket_launch: Release window": "On which days are production releases deployed?",
+    ":material/engineering: Projects in progress": "Which engineering projects are currently in progress?",
+    ":material/code: Validation code": "What does the code repository contain about validation?",
+}
+TOOL_RESULT_PREVIEW_CHARS = 2000
 
 
-@st.cache_resource(show_spinner=False)
+@st.cache_resource(show_spinner="Loading search engines...")
 def get_agent() -> LangChainSearchAgent:
     ensure_seed_data()
+    # One agent is shared by every browser tab. Its checkpointer keeps a separate
+    # conversation per thread_id, and each tab holds its own thread_id in session state.
     return LangChainSearchAgent()
 
 
-def init_session_state() -> None:
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-    if "is_searching" not in st.session_state:
-        st.session_state.is_searching = False
+def start_new_conversation() -> None:
+    # Reset both together: thread_id selects the agent's memory, messages are what the page shows.
+    # Resetting only one would leave the page and the agent remembering different conversations.
+    st.session_state.thread_id = str(uuid.uuid4())
+    st.session_state.messages = []
+    st.session_state.pop("suggestion", None)
 
 
-def render_json_block(title: str, payload: object) -> None:
-    with st.expander(title, expanded=False):
-        st.code(json.dumps(payload, indent=2, ensure_ascii=False, default=str), language="json")
+def queue_suggestion() -> None:
+    selected = st.session_state.suggestion
+    if selected:
+        st.session_state.pending_question = SUGGESTIONS[selected]
 
 
-def perform_search(agent: LangChainSearchAgent, question: str) -> str:
-    status_area = st.empty()
-    trace_area = st.container()
-    final_area = st.empty()
-
-    final_answer = ""
-
-    try:
-        for step in agent.search_stream(question):
-            step_name = step.get("step")
-
-            if step_name == "init":
-                status_area.info("Agent planning in progress...")
-                with trace_area:
-                    st.markdown("##### User Question")
-                    st.info(step.get("question", question))
-                    st.markdown(
-                        "<span class='trace-label trace-prompt'>1. System Prompt</span>",
-                        unsafe_allow_html=True,
-                    )
-                    with st.expander("View system prompt", expanded=False):
-                        st.code(step.get("system_prompt", ""), language="markdown")
-
-            elif step_name == "tool_call":
-                with trace_area:
-                    st.markdown("---")
-                    st.markdown(
-                        f"<span class='trace-label trace-tool'>Tool Call: {step.get('tool_name')}</span>",
-                        unsafe_allow_html=True,
-                    )
-                    st.markdown("Arguments")
-                    st.code(json.dumps(step.get("arguments", {}), indent=2), language="json")
-                    render_json_block("Tool result", step.get("result"))
-
-            elif step_name == "local_fallback":
-                status_area.warning("No model API key is configured. Showing local fallback results.")
-                render_json_block("Fallback trace", step.get("trace", {}))
-
-            elif step_name == "api_error":
-                status_area.error("Model API call failed. Check the configured model, key, and endpoint region.")
-                render_json_block(
-                    "API error",
-                    {
-                        "model": step.get("model"),
-                        "base_url": step.get("base_url"),
-                        "error": step.get("error"),
-                    },
-                )
-
-            elif step_name == "final":
-                status_area.success(f"Search completed in {step.get('round', 0)} round(s).")
-                final_answer = step.get("final_answer", "")
-                final_area.markdown("### Final Answer")
-                final_area.markdown(final_answer)
-
-        return final_answer or "No answer was generated."
-    except Exception as exc:
-        status_area.error(f"Search failed: {exc}")
-        return f"Search failed: {exc}"
+def trace_label(reply: dict[str, Any]) -> str:
+    calls = len(reply["tool_calls"])
+    parts = ["Search trace", f"{calls} tool call{'' if calls == 1 else 's'}" if calls else "no tool calls"]
+    context_tokens = reply["usage"].get("context_tokens")
+    if context_tokens:
+        parts.append(f"{context_tokens:,} context tokens")
+    if reply["error"]:
+        parts.append("failed")
+    return " · ".join(parts)
 
 
-init_session_state()
+def render_tool_call(call: dict[str, Any]) -> None:
+    st.markdown(f"**{call['tool']}**")
+    st.code(json.dumps(call["arguments"], ensure_ascii=False, indent=2, default=str), language="json")
+    result = str(call["result"])
+    if len(result) > TOOL_RESULT_PREVIEW_CHARS:
+        result = result[:TOOL_RESULT_PREVIEW_CHARS] + "\n... (truncated)"
+    st.code(result, language="json", wrap_lines=True)
+
+
+def render_trace_details(reply: dict[str, Any]) -> None:
+    if not reply["tool_calls"]:
+        st.caption("No tool calls in this turn.")
+    for call in reply["tool_calls"]:
+        render_tool_call(call)
+    usage = reply["usage"]
+    if usage:
+        st.caption(
+            f"{usage.get('model_calls', 0)} model calls · {usage.get('input_tokens', 0):,} input tokens · "
+            f"{usage.get('output_tokens', 0):,} output tokens · "
+            f"about {usage.get('tool_result_tokens', 0):,} tokens of tool results"
+        )
+    if reply["error"]:
+        st.error(reply["error"], icon=":material/error:")
+
+
+def run_turn(agent: LangChainSearchAgent, question: str, thread_id: str) -> dict[str, Any]:
+    """Run one turn, showing tool calls live, and return everything needed to redraw it later."""
+    reply: dict[str, Any] = {
+        "role": "assistant",
+        "content": "",
+        "tool_calls": [],
+        "usage": {},
+        "error": None,
+        "fallback": False,
+    }
+    with st.status("Searching...", expanded=False) as status:
+        for step in agent.search_stream(question, thread_id=thread_id):
+            kind = step["step"]
+            if kind == "tool_call":
+                call = {"tool": step["tool_name"], "arguments": step["arguments"], "result": step["result"]}
+                reply["tool_calls"].append(call)
+                status.update(label=f"Searching... {len(reply['tool_calls'])} tool call(s)")
+                render_tool_call(call)
+            elif kind == "api_error":
+                reply["error"] = step["error"]
+                st.error(step["error"], icon=":material/error:")
+            elif kind == "local_fallback":
+                reply["fallback"] = True
+            elif kind == "final":
+                reply["content"] = step["final_answer"]
+                reply["usage"] = step.get("usage", {})
+        status.update(label=trace_label(reply), state="error" if reply["error"] else "complete")
+    return reply
+
+
+def render_assistant_extras(reply: dict[str, Any]) -> None:
+    if reply.get("fallback"):
+        st.warning("No API key is configured, so this answer comes from the local fallback search "
+                   "and has no conversation memory.", icon=":material/warning:")
+
+
+st.session_state.setdefault("messages", [])
+if "thread_id" not in st.session_state:
+    start_new_conversation()
+
 agent = get_agent()
 
-st.markdown("<p class='main-header'>Agentic Search</p>", unsafe_allow_html=True)
-st.markdown(
-    "<p class='sub-header'>A Qwen-compatible enterprise search demo with tool calling, multi-source retrieval, and explicit API error reporting.</p>",
-    unsafe_allow_html=True,
-)
-
-col1, col2 = st.columns([4, 1])
-with col1:
-    question = st.text_input(
-        "Question",
-        placeholder="Example: What is the May cloud service expense trend?",
-        label_visibility="collapsed",
-        key="question_input",
-    )
-with col2:
-    search_button = st.button("Search", type="primary", use_container_width=True)
-
-if search_button and question:
-    st.session_state.is_searching = True
-    answer = perform_search(agent, question)
-    st.session_state.messages.append({"role": "user", "content": question})
-    st.session_state.messages.append({"role": "assistant", "content": answer})
-    st.session_state.is_searching = False
-
-st.divider()
-st.markdown("### Conversation History")
-
-if st.session_state.messages:
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-else:
-    st.info("Enter a question above to start searching.")
-
 with st.sidebar:
-    st.markdown("### Data Sources")
+    st.button("New conversation", icon=":material/add_comment:", on_click=start_new_conversation, width="stretch")
+    # The sidebar is drawn before the current question runs, so it shows no turn count that would lag by one.
+    st.caption(f"Conversation `{st.session_state.thread_id[:8]}`")
+
+    st.subheader("Configuration")
     st.markdown(
-        """
-        <span class="source-badge">SQLite records</span>
-        <span class="source-badge">Chroma vectors</span>
-        <span class="source-badge">Whoosh keyword index</span>
-        <span class="source-badge">Sample code repository</span>
-        <span class="source-badge">Enterprise system simulator</span>
-        """,
-        unsafe_allow_html=True,
+        f"- Agent model: `{LLM_MODEL}`\n"
+        f"- Embedding model: `{EMBEDDING_MODEL}`\n"
+        f"- Distance threshold: `{VECTOR_DISTANCE_THRESHOLD}`\n"
+        f"- Max search rounds per turn: `{MAX_SEARCH_ROUNDS}`"
     )
 
-    st.markdown("### System")
+    st.subheader("Data sources")
     st.markdown(
-        """
-        - Model: Qwen-compatible chat model
-        - Max search rounds: 6
-        - Fallback: local deterministic search
-        - Demo data: synthetic English enterprise records
-        """
+        "- SQLite records\n"
+        "- Chroma vector collections, including the employee handbook and engineering guide\n"
+        "- Whoosh keyword indexes\n"
+        "- Sample code repository\n"
+        "- Simulated HR, finance, project, and wiki systems"
     )
 
-    st.markdown("### Status")
-    st.write("Searching..." if st.session_state.is_searching else "Ready")
+    with st.expander("System prompt", icon=":material/description:"):
+        st.code(SYSTEM_PROMPT, language="markdown", wrap_lines=True)
 
-    if st.button("Clear history", use_container_width=True):
-        st.session_state.messages = []
-        st.rerun()
+st.title("Agentic search")
+st.caption("Ask follow-up questions: the agent remembers this conversation until you start a new one.")
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        if message["role"] == "assistant":
+            with st.expander(trace_label(message), icon=":material/manage_search:"):
+                render_trace_details(message)
+            render_assistant_extras(message)
+        st.markdown(message["content"])
+
+# submit_mode="disable" blocks a second question while a turn is running, so two turns
+# never write to the same thread at once.
+question = st.chat_input("Ask about policies, projects, finance, or code", submit_mode="disable")
+question = question or st.session_state.pop("pending_question", None)
+
+if not st.session_state.messages and not question:
+    st.pills("Try asking", list(SUGGESTIONS), key="suggestion", on_change=queue_suggestion,
+             label_visibility="collapsed")
+
+if question:
+    st.session_state.messages.append({"role": "user", "content": question})
+    with st.chat_message("user"):
+        st.markdown(question)
+
+    with st.chat_message("assistant"):
+        reply = run_turn(agent, question, st.session_state.thread_id)
+        render_assistant_extras(reply)
+        st.markdown(reply["content"])
+
+    st.session_state.messages.append(reply)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -25,6 +26,8 @@ def main() -> None:
 
     agent = LangChainSearchAgent()
 
+    thread_id = str(uuid.uuid4())
+
     print("\n" + "=" * 72)
     print("  System ready. Enter a question to search, or type 'quit' to exit.")
     print("  Searchable sources:")
@@ -35,17 +38,21 @@ def main() -> None:
     print("    5. Simulated enterprise systems: HR, finance, project, wiki")
     print("    6. Operation logs")
     print("=" * 72)
-
+    
     while True:
         try:
             question = input("\n[?] Question: ").strip()
+            if question.lower() == "new":    # start new conversation
+                thread_id = str(uuid.uuid4())
+                print("[*] Started a new conversation.")
+                continue
             if not question:
                 continue
             if question.lower() in {"quit", "exit", "q"}:
                 print("[*] Goodbye.")
                 break
 
-            answer = agent.search(question, verbose=True)
+            answer = agent.search(question, thread_id=thread_id, verbose=True)
             print("\n" + answer)
         except KeyboardInterrupt:
             print("\n[*] Goodbye.")

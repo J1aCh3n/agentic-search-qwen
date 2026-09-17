@@ -8,8 +8,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from config import JUDGE_MODEL
-from evals.eval_retrieval import GOLDEN_SET
-from evals.judge_answers import CALIBRATION_SET, Verdict, create_judge, judge_answer
+from evals.judge_answers import CALIBRATION_SET, Verdict, create_judge, judge_answer, load_cases
 
 ANSWERABLE = {
     "id": "meal",
@@ -49,6 +48,22 @@ class AnswerJudgeTests(unittest.TestCase):
         self.assertEqual(payload["reference"], NEAR_MISS["refusal_reason"])
         self.assertIsNone(payload["expected_source"])
 
+    def test_single_question_has_no_earlier_turns(self):
+        judge = Mock()
+        judge.invoke.return_value = Verdict(reasoning="ok", passed=True, failure_type="none")
+        judge_answer(judge, ANSWERABLE, "85 CAD per day (employee handbook).")
+        self.assertEqual(sent_payload(judge)["earlier_turns"], [])
+
+    def test_conversation_sends_earlier_turns_and_grades_the_last_one(self):
+        judge = Mock()
+        judge.invoke.return_value = Verdict(reasoning="ok", passed=True, failure_type="none")
+        conversation = {**ANSWERABLE, "turns": ["What is the daily meal allowance?", "Is that per person?"],
+                        "question": "Is that per person?"}
+        judge_answer(judge, conversation, "Yes, per person (employee handbook).")
+        payload = sent_payload(judge)
+        self.assertEqual(payload["earlier_turns"], ["What is the daily meal allowance?"])
+        self.assertEqual(payload["question"], "Is that per person?")
+
     @patch("evals.judge_model.time.sleep")
     def test_errors_are_retried_once_then_become_judge_error(self, _sleep):
         cases = {
@@ -83,14 +98,14 @@ class AnswerJudgeTests(unittest.TestCase):
         self.assertEqual(kwargs["method"], "function_calling")
         self.assertEqual(kwargs["extra_body"], {"enable_thinking": False})
 
-    def test_golden_set_has_a_reference_for_every_case(self):
-        for case in json.loads(GOLDEN_SET.read_text(encoding="utf-8")):
+    def test_every_case_has_a_reference_for_the_judge(self):
+        for case in load_cases().values():
             field = "reference_answer" if case["type"] == "answerable" else "refusal_reason"
             with self.subTest(case=case["id"]):
                 self.assertTrue(case.get(field, "").strip())
 
     def test_calibration_fixtures_point_at_real_cases_with_consistent_labels(self):
-        case_ids = {case["id"] for case in json.loads(GOLDEN_SET.read_text(encoding="utf-8"))}
+        case_ids = set(load_cases())
         for fixture in json.loads(CALIBRATION_SET.read_text(encoding="utf-8")):
             with self.subTest(fixture=fixture["id"]):
                 self.assertIn(fixture["case_id"], case_ids)
