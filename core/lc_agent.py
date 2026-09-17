@@ -1,10 +1,11 @@
-"""Step 2b: the LangChain version of core/agent.py.
+"""The agent used by the app and the CLI.
 
-The old search_stream() hand-wrote the agent loop: call the model, parse tool
-calls, run tools, append messages, repeat. create_agent() builds that exact
-loop for us (as a small LangGraph graph with a "model" node and a "tools" node).
+The graph itself lives in core/graph.py: a "model" node, a "tools" node, and a
+conditional edge between them. It was first built by LangChain's create_agent()
+and is now assembled by hand with LangGraph, which sends the model the same
+request but leaves room for extra nodes such as a router.
 
-The rest of this file only translates LangChain's stream into the step dicts
+The rest of this file only translates the graph's stream into the step dicts
 that app.py already knows how to display, so the UI does not need to change.
 """
 from __future__ import annotations
@@ -13,7 +14,6 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from langchain.agents import create_agent
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import RemoveMessage
 from langchain_core.messages.utils import count_tokens_approximately
@@ -22,6 +22,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.errors import GraphRecursionError
 
 from config import LLM_BASE_URL, LLM_MODEL, MAX_SEARCH_ROUNDS
+from core.graph import build_graph
 from core.lc_llm import get_chat_model, has_api_key
 from core.lc_tools import build_tools
 from core.local_search import LocalFallbackSearch
@@ -54,9 +55,9 @@ class LangChainSearchAgent:
             tools = build_tools(db, VectorDBEngine(), keyword_search, code_search, enterprise_sdk)
             # The fallback reuses the same engines instead of opening a second set.
             self._local_fallback = LocalFallbackSearch(db, keyword_search, code_search, enterprise_sdk)
-        # This one line replaces the whole hand-written loop in core/agent.py.
-        # The checkpointer keeps each conversation's messages under its thread_id.
-        self.agent = create_agent(
+        # build_graph() wires the model and tool nodes into the loop that core/agent.py
+        # hand-wrote. The checkpointer keeps each conversation's messages under its thread_id.
+        self.agent = build_graph(
             model=model or get_chat_model(),
             tools=tools,
             system_prompt=SYSTEM_PROMPT,

@@ -152,6 +152,20 @@ class ConversationMemoryTests(unittest.TestCase):
         self.assertEqual(final["usage"]["input_tokens"], 0)
 
 
+class GraphStructureTests(unittest.TestCase):
+    def test_the_graph_has_the_nodes_and_edges_the_stream_reader_expects(self):
+        # search_stream() reads updates by node name and counts two graph steps per round,
+        # so the shape of the graph is part of the contract, not just an implementation detail.
+        agent, _ = make_agent(reply("answer"))
+        graph = agent.agent.get_graph()
+        edges = {(edge.source, edge.target) for edge in graph.edges}
+        self.assertEqual(set(graph.nodes), {"__start__", "model", "tools", "__end__"})
+        self.assertEqual(
+            edges,
+            {("__start__", "model"), ("model", "tools"), ("model", "__end__"), ("tools", "model")},
+        )
+
+
 class FallbackTests(unittest.TestCase):
     @patch("core.lc_agent.has_api_key", return_value=False)
     @patch("core.lc_agent.LocalFallbackSearch")

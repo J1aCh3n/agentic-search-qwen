@@ -84,7 +84,12 @@ def source_documents() -> dict[str, str]:
     from engines.enterprise_sdk import EnterpriseSDK
 
     def titled(items: list[dict]) -> str:
-        return "\n".join(f"{item['title']}: {item['content']}" for item in items)
+        # The id is part of the text too: keyword search returns it, answers cite it
+        # (for example policy_002), and a judge that never saw it calls it invented.
+        return "\n".join(
+            f"{item['id'] + ' ' if 'id' in item else ''}{item['title']}: {item['content']}"
+            for item in items
+        )
 
     documents = {path.name: path.read_text(encoding="utf-8") for path in sorted(DOCS_DIR.glob("*.md"))}
     documents["vector collection company_info"] = "\n".join(seed.COMPANY_DOCS)

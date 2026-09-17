@@ -2,7 +2,7 @@
 
 Agentic Search Qwen is a Streamlit demo of an enterprise search assistant that uses a Qwen-compatible chat model to choose tools, retrieve evidence, and answer questions over multiple synthetic data sources.
 
-The agent is built with LangChain (`create_agent`), which runs the tool-calling loop on top of LangGraph. Retrieval is real RAG: documents are chunked, embedded with a DashScope embedding model, and filtered by a distance threshold so that irrelevant results are reported as missing evidence instead of being answered from general knowledge.
+The tool-calling loop is a LangGraph `StateGraph` in `core/graph.py`: a model node, a tool node, and a conditional edge that runs tools while the model asks for them. It started as LangChain's `create_agent` and was rebuilt by hand so that extra nodes can be added; the rebuilt graph sends the model the same request, which was checked by comparing the outgoing payloads. Retrieval is real RAG: documents are chunked, embedded with a DashScope embedding model, and filtered by a distance threshold so that irrelevant results are reported as missing evidence instead of being answered from general knowledge.
 
 The repository has been converted to an English-only public demo. The data is synthetic and is intended for portfolio review, not production use.
 
@@ -34,7 +34,8 @@ The repository has been converted to an English-only public demo. The data is sy
 +-- config.py               # Runtime paths, model, embedding, and threshold configuration
 +-- seed_data_large.py      # English synthetic data generator, including document chunking
 +-- core/
-|   +-- lc_agent.py         # LangChain agent (create_agent) used by the app and CLI
+|   +-- lc_agent.py         # Agent used by the app and CLI: runs the graph, streams steps, rolls back failed turns
+|   +-- graph.py            # LangGraph StateGraph: model node, tools node, conditional edge
 |   +-- lc_tools.py         # Tools defined with the @tool decorator
 |   +-- lc_llm.py           # ChatOpenAI client pointed at the DashScope endpoint
 |   +-- prompts.py          # System prompt shared by both agents and the UI
@@ -159,7 +160,8 @@ Baseline at `VECTOR_DISTANCE_THRESHOLD=0.70` with `qwen3.6-plus` and `text-embed
 | Retrieval, 4 near-miss questions | 0/4 blocked by the threshold, 4/4 judged as not answering the question |
 | End-to-end answers (LLM judge) | 23/23 |
 | Regression after switching the agent to `qwen3.6-plus-2026-04-02` and adding memory | keyword grading 23/23, LLM judge 23/23; 130,185 input and 9,730 output tokens |
-| Answer judge vs. 21 hand-labelled answers | `qwen3.7-plus-2026-05-26` 21/21 in two runs, keyword grading 14/21 |
+| Answer judge vs. 21 hand-labelled answers | `qwen3.7-plus-2026-05-26` 21/21 in three runs, keyword grading 14/21 |
+| Regression after rebuilding the loop as a hand-written `StateGraph` | keyword grading 22/23, LLM judge 22/23; 123,341 input and 10,186 output tokens; conversations 8/8 |
 
 The near-miss row is the main finding: related chunks pass any usable threshold, so refusing those questions depends on the model and the system prompt.
 
