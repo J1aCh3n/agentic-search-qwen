@@ -4,6 +4,23 @@ Agentic Search Qwen is a Streamlit demo of an enterprise search assistant that u
 
 The repository has been converted to an English-only public demo. The data is synthetic and is intended for portfolio review, not production use.
 
+## Branches
+
+The same assistant is kept in three branches, one per stage of learning, so the steps can be compared instead of being hidden in the history of a single line of commits.
+
+| Branch | What it is | Added in this stage |
+| --- | --- | --- |
+| `main` | The starting point: a hand-written tool-calling loop on the OpenAI SDK | The loop itself, the five search engines, a rule-based local fallback, and a hash-based placeholder embedding so the vector path runs offline |
+| `langchain-agent` | The same assistant rebuilt on LangChain | `create_agent`, tools declared with `@tool`, real DashScope embeddings and document chunking, a distance threshold, a 23-question golden set with retrieval and answer evaluation, LLM judges, and conversation memory with rollback |
+| `langgraph` | The current stage, built on `langchain-agent` | The agent loop rewritten as a LangGraph `StateGraph`, verified to send the model the same request as `create_agent`, plus a router node that picks a tool group per question and cuts input tokens by about a third |
+
+Each branch has its own README describing that stage. Read `langgraph` for the most complete version of the project; read `main` (this one) for the version that does everything by hand.
+
+```powershell
+git checkout langchain-agent
+git checkout langgraph
+```
+
 ## Features
 
 - Streamlit interface for interactive search and trace inspection
