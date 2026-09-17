@@ -47,6 +47,8 @@ def queue_suggestion() -> None:
 def trace_label(reply: dict[str, Any]) -> str:
     calls = len(reply["tool_calls"])
     parts = ["Search trace", f"{calls} tool call{'' if calls == 1 else 's'}" if calls else "no tool calls"]
+    if reply.get("route"):
+        parts.append(f"{reply['route']} tools")
     context_tokens = reply["usage"].get("context_tokens")
     if context_tokens:
         parts.append(f"{context_tokens:,} context tokens")
@@ -74,7 +76,8 @@ def render_trace_details(reply: dict[str, Any]) -> None:
         st.caption(
             f"{usage.get('model_calls', 0)} model calls · {usage.get('input_tokens', 0):,} input tokens · "
             f"{usage.get('output_tokens', 0):,} output tokens · "
-            f"about {usage.get('tool_result_tokens', 0):,} tokens of tool results"
+            f"about {usage.get('tool_result_tokens', 0):,} tokens of tool results · "
+            f"{usage.get('router_tokens', 0):,} tokens to pick the tool group"
         )
     if reply["error"]:
         st.error(reply["error"], icon=":material/error:")
@@ -87,6 +90,7 @@ def run_turn(agent: LangChainSearchAgent, question: str, thread_id: str) -> dict
         "content": "",
         "tool_calls": [],
         "usage": {},
+        "route": "",
         "error": None,
         "fallback": False,
     }
@@ -105,6 +109,7 @@ def run_turn(agent: LangChainSearchAgent, question: str, thread_id: str) -> dict
                 reply["fallback"] = True
             elif kind == "final":
                 reply["content"] = step["final_answer"]
+                reply["route"] = step.get("route", "")
                 reply["usage"] = step.get("usage", {})
         status.update(label=trace_label(reply), state="error" if reply["error"] else "complete")
     return reply

@@ -1,9 +1,9 @@
 """The agent used by the app and the CLI.
 
-The graph itself lives in core/graph.py: a "model" node, a "tools" node, and a
-conditional edge between them. It was first built by LangChain's create_agent()
-and is now assembled by hand with LangGraph, which sends the model the same
-request but leaves room for extra nodes such as a router.
+The graph itself lives in core/graph.py: a "router" node that picks which tools
+the model is shown, a "model" node, a "tools" node, and a conditional edge
+between the last two. It was first built by LangChain's create_agent() and is
+now assembled by hand with LangGraph, which left room for the router node.
 
 The rest of this file only translates the graph's stream into the step dicts
 that app.py already knows how to display, so the UI does not need to change.
@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import RemoveMessage
@@ -28,6 +28,7 @@ from core.lc_tools import build_tools
 from core.local_search import LocalFallbackSearch
 from core.logger import Logger
 from core.prompts import SYSTEM_PROMPT
+from core.router import create_router
 from engines.code_search import CodeSearchEngine
 from engines.database import DatabaseEngine
 from engines.enterprise_sdk import EnterpriseSDK
@@ -44,9 +45,15 @@ class LangChainSearchAgent:
         model: BaseChatModel | None = None,
         tools: list | None = None,
         checkpointer: BaseCheckpointSaver | None = None,
+        router: Callable | None = None,
     ) -> None:
         """Defaults build the real agent. Tests pass a fake model and tools to run offline."""
         self.logger = Logger()
+        if router is None and model is None:
+            # Only the real agent routes. A test passing a fake model would otherwise
+            # spend its scripted replies on routing calls. temperature=0 because the
+            # same question should always take the same branch.
+            router = create_router(get_chat_model(temperature=0))
         self._local_fallback: LocalFallbackSearch | None = None
         if tools is None:
             db, keyword_search, code_search, enterprise_sdk = (
@@ -62,6 +69,7 @@ class LangChainSearchAgent:
             tools=tools,
             system_prompt=SYSTEM_PROMPT,
             checkpointer=checkpointer or InMemorySaver(),
+            router=router,
         )
 
     def search(self, question: str, thread_id: str | None = None, verbose: bool = False) -> str:
@@ -99,11 +107,13 @@ class LangChainSearchAgent:
             return
 
         round_idx = 0
+        route = "unknown"
         pending_calls: dict[str, dict[str, Any]] = {}  # tool_call_id -> {"name", "args"}
         final_answer = ""
         messages_before = len(self.agent.get_state(config).values.get("messages", []))
         turn_completed = False
-        usage = {"model_calls": 0, "input_tokens": 0, "output_tokens": 0, "context_tokens": 0, "tool_result_tokens": 0}
+        usage = {"model_calls": 0, "input_tokens": 0, "output_tokens": 0, "context_tokens": 0,
+                 "tool_result_tokens": 0, "router_tokens": 0}
 
         try:
             # stream_mode="updates" yields one dict per finished node:
@@ -117,6 +127,15 @@ class LangChainSearchAgent:
             )
             for chunk in stream:
                 for node, update in chunk.items():
+                    if node == "router":
+                        # The routing call has its own cost, so it is part of the turn's usage.
+                        route = (update or {}).get("route", "unknown")
+                        router_usage = (update or {}).get("router_usage") or {}
+                        usage["input_tokens"] += router_usage.get("input_tokens", 0)
+                        usage["output_tokens"] += router_usage.get("output_tokens", 0)
+                        usage["router_tokens"] = (
+                            router_usage.get("input_tokens", 0) + router_usage.get("output_tokens", 0)
+                        )
                     for message in (update or {}).get("messages", []):
                         if node == "model":
                             round_idx += 1
@@ -166,7 +185,8 @@ class LangChainSearchAgent:
 
         final_answer = final_answer or "The model did not return an answer."
         self.logger.log_final_answer(question, final_answer, round_idx)
-        yield {"step": "final", "round": round_idx, "final_answer": final_answer, "usage": usage}
+        yield {"step": "final", "round": round_idx, "final_answer": final_answer,
+               "route": route, "usage": usage}
 
     def _fallback(self) -> LocalFallbackSearch:
         # Agents built with injected tools (tests) create the fallback engines only if needed.
@@ -181,4 +201,9 @@ class LangChainSearchAgent:
         messages = self.agent.get_state(config).values.get("messages", [])
         added = messages[messages_before:]
         if added:
-            self.agent.update_state(config, {"messages": [RemoveMessage(id=m.id) for m in added]})
+            # as_node="model" tells the graph to recompute what comes next as if the model
+            # node had just written this update. The messages that are left end on a finished
+            # answer, so the conditional edge goes to END and the thread has nothing pending.
+            self.agent.update_state(
+                config, {"messages": [RemoveMessage(id=m.id) for m in added]}, as_node="model"
+            )

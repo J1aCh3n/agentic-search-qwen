@@ -14,6 +14,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.tools import tool
 from pydantic import Field
 
+from core import router
 from core.lc_agent import LangChainSearchAgent
 
 
@@ -54,9 +55,9 @@ def tool_call(name, call_id):
     return AIMessage(content="", tool_calls=[{"name": name, "args": {"query": "x"}, "id": call_id}])
 
 
-def make_agent(*replies, tools=(lookup, broken)):
+def make_agent(*replies, tools=(lookup, broken), router=None):
     model = FakeModel(messages=iter(replies))
-    return LangChainSearchAgent(model=model, tools=list(tools)), model
+    return LangChainSearchAgent(model=model, tools=list(tools), router=router), model
 
 
 def thread_messages(agent, thread_id):
@@ -131,6 +132,15 @@ class ConversationMemoryTests(unittest.TestCase):
         self.assertEqual(humans(messages), ["question 1"])
         self.assertEqual(pending, ())
 
+    def test_a_failed_first_turn_leaves_an_empty_thread(self, _key):
+        # Rollback removes every message, so the next turn starts from nothing.
+        agent, _ = make_agent(tool_call("broken", "c1"), reply("answer 2"))
+        list(agent.search_stream("question 1", thread_id="t"))
+        messages, pending = thread_messages(agent, "t")
+        self.assertEqual(messages, [])
+        self.assertEqual(pending, ())
+        self.assertEqual(agent.search("question 2", thread_id="t"), "answer 2")
+
     def test_usage_sums_model_calls_and_keeps_last_context_size(self, _key):
         agent, _ = make_agent(
             AIMessage(content="", tool_calls=[{"name": "lookup", "args": {"query": "x"}, "id": "c1"}],
@@ -159,11 +169,46 @@ class GraphStructureTests(unittest.TestCase):
         agent, _ = make_agent(reply("answer"))
         graph = agent.agent.get_graph()
         edges = {(edge.source, edge.target) for edge in graph.edges}
-        self.assertEqual(set(graph.nodes), {"__start__", "model", "tools", "__end__"})
+        self.assertEqual(set(graph.nodes), {"__start__", "router", "model", "tools", "__end__"})
         self.assertEqual(
             edges,
-            {("__start__", "model"), ("model", "tools"), ("model", "__end__"), ("tools", "model")},
+            {("__start__", "router"), ("router", "model"), ("model", "tools"),
+             ("model", "__end__"), ("tools", "model")},
         )
+
+
+class RouterTests(unittest.TestCase):
+    def test_each_category_selects_its_own_tools_and_unknown_keeps_all(self):
+        tools = [lookup, broken]
+        with patch.dict(router.TOOL_GROUPS, {"docs": ("lookup",), "code": ("broken",)}, clear=True):
+            self.assertEqual(router.tools_for(tools, "docs"), [lookup])
+            self.assertEqual(router.tools_for(tools, "code"), [broken])
+            self.assertEqual(router.tools_for(tools, "unknown"), tools)
+
+    @patch("core.lc_agent.has_api_key", return_value=True)
+    def test_the_turn_reports_the_route_and_counts_the_routing_call(self, _key):
+        def fake_router(question):
+            return {"category": "code", "input_tokens": 90, "output_tokens": 4}
+
+        agent, _ = make_agent(reply("answer", input_tokens=1000, output_tokens=20), router=fake_router)
+        final = list(agent.search_stream("where is the config?"))[-1]
+        self.assertEqual(final["route"], "code")
+        self.assertEqual(final["usage"]["router_tokens"], 94)
+        self.assertEqual(final["usage"]["input_tokens"], 1090)
+        self.assertEqual(final["usage"]["output_tokens"], 24)
+        # The routing call is not a search round, so it does not count as a model call.
+        self.assertEqual(final["usage"]["model_calls"], 1)
+
+    def test_a_failed_routing_call_falls_back_to_every_tool(self):
+        class Boom:
+            def with_structured_output(self, *a, **k):
+                return self
+
+            def invoke(self, *a, **k):
+                raise RuntimeError("router is down")
+
+        result = router.create_router(Boom())("any question")
+        self.assertEqual(result["category"], "unknown")
 
 
 class FallbackTests(unittest.TestCase):
