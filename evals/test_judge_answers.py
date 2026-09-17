@@ -48,6 +48,19 @@ class AnswerJudgeTests(unittest.TestCase):
         self.assertEqual(payload["reference"], NEAR_MISS["refusal_reason"])
         self.assertIsNone(payload["expected_source"])
 
+    def test_payload_includes_every_source_document(self):
+        for case in (ANSWERABLE, NEAR_MISS):
+            with self.subTest(case=case["id"]):
+                judge = Mock()
+                judge.invoke.return_value = Verdict(reasoning="ok", passed=True, failure_type="none")
+                judge_answer(judge, case, "answer")
+                documents = sent_payload(judge)["source_documents"]
+                self.assertIn("85 Canadian dollars", documents["employee_handbook.md"])
+                self.assertIn("two approvals", documents["engineering_guide.md"])
+                # The keyword index holds a different remote work rule than the handbook.
+                self.assertIn("two days per week", documents["keyword index policies"])
+                self.assertIn("wiki system", documents)
+
     def test_single_question_has_no_earlier_turns(self):
         judge = Mock()
         judge.invoke.return_value = Verdict(reasoning="ok", passed=True, failure_type="none")

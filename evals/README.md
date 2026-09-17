@@ -13,7 +13,7 @@ Run every command from the project root with the project's Python environment.
 | `golden_conversations.json` | 8 multi-turn conversations (17 turns): pronoun and ellipsis follow-ups, follow-ups asking for a new fact, a three-turn chain, a topic switch, and near-miss and unrelated follow-ups |
 | `eval_conversations.py` | Multi-turn: one thread per conversation, grades the last turn, records per-turn tokens and whether follow-ups searched again |
 | `judge_answers.py` | LLM judge for the answers saved by `eval_agent.py`, with a calibration mode |
-| `judge_calibration.json` | 14 hand-labelled answers used to check the answer judge |
+| `judge_calibration.json` | 21 hand-labelled answers used to check the answer judge |
 | `judge_model.py` | Judge model setup and retry, shared by both judges |
 | `test_*.py` | Offline tests with fake verdicts. They test plumbing, not judge accuracy |
 
@@ -51,13 +51,15 @@ python -m unittest tests.test_lc_agent evals.test_eval_retrieval_judge evals.tes
 
 **Keyword grading and the LLM judge run side by side.** Keyword grading is free and deterministic but misses paraphrases (`10 paid sick days`), new refusal wording (`do not contain`), negations (`not 85`), and refusals followed by a guess. The judge understands those but can also be wrong. `judge_answers.py` lists every case where the two disagree.
 
+**The answer judge checks claims against the source text, not only the reference.** A reference answer lists the key facts, but an agent answer often adds other true details. A judge that saw only the reference had to guess whether those details were real: it failed correct answers that added real rules, and graded one unchanged answer differently on two runs. The judge now receives every text source the agent can search (`data/docs/`, the vector collections, the keyword indexes, and the wiki system, about 2,500 tokens) and fails any claim about the company that no source states. Giving it only `data/docs/` was not enough: an answer quoting the two-day remote work rule from the keyword policy index was called a hallucination. Structured records (SQLite and the HR, finance, and project systems) are not included, so an answer that cites them would show up as a disagreement for a human to check.
+
 **Calibrate the judge before trusting it.** `judge_calibration.json` mixes real agent answers with answers written to fool keyword grading. The first judge prompt passed an answer with no citation, reasoning that a simple fact did not need one; calibration caught it and the rubric now lists every pass condition explicitly. Add a fixture whenever you find a new misjudgement. Leave out answers whose correct label is debatable.
 
 **The judge model is separate from the agent model.** `DASHSCOPE_JUDGE_MODEL` defaults to `qwen3.7-plus-2026-05-26` while the agent uses `qwen3.6-plus-2026-04-02`. Both are dated snapshots. A dated snapshot keeps scores comparable, because an alias such as `qwen3.7-plus` can be moved to a newer model. A different model generation reduces self-preference, and DashScope free quota is per model, so judging does not spend the agent's quota. Calibration results for the models tried:
 
 | Judge model | Agrees with labels | Notes |
 | --- | --- | --- |
-| `qwen3.7-plus-2026-05-26` | 14/14, two runs | about 35 s and 990 tokens per call |
+| `qwen3.7-plus-2026-05-26` | 14/14, two runs; 21/21 on the current set with source documents, two runs | about 35 s and 990 tokens per call before source documents were added |
 | `qwen3.6-plus` | 14/14, two runs | the agent's own model |
 | `qwen3.6-flash` | 13/14 | one call returned no verdict; wrote about 600 output tokens per call |
 | `qwen3.7-flash` | 13/14 | passed an uncited answer, claiming it cited employee_handbook.md |
@@ -70,7 +72,9 @@ A failure that produces no verdict is visible as `judge_error`; a wrong verdict 
 
 ## Limitations
 
-- The calibration set has 14 answers. It catches obvious rubric problems, not rare ones.
+- The calibration set has 21 answers. It catches obvious rubric problems, not rare ones.
+- Failure types for borderline answers can still vary between runs. `fake-conv-per-person-wrong-referent` fails in every run, but was labelled `missing_fact` in one run and `wrong_fact` in the next.
+- The judge does not see structured records, so answers built on SQLite or the enterprise systems cannot be checked for unsupported details.
 - The judge and the agent are different generations of the same Qwen family, so correlated mistakes are still possible. A judge from another model family would be a stronger check.
 - Every configuration has been run once. The agent is not deterministic, so a one-case difference between runs can be noise.
 - Unrelated questions are full sentences that the agent refuses without searching, so they do not measure the distance threshold. Short noisy queries such as `cake` would.

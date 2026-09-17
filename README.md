@@ -156,8 +156,8 @@ Baseline at `VECTOR_DISTANCE_THRESHOLD=0.70` with `qwen3.6-plus` and `text-embed
 | Retrieval, 4 unrelated questions | 4/4 blocked by the threshold |
 | Retrieval, 4 near-miss questions | 0/4 blocked by the threshold, 4/4 judged as not answering the question |
 | End-to-end answers (LLM judge) | 23/23 |
-| Regression after switching the agent to `qwen3.6-plus-2026-04-02` and adding memory | keyword grading 23/23; judge 22/23, and the one failure is a judge error (see below); 130,185 input and 9,730 output tokens |
-| Answer judge vs. 17 hand-labelled answers, including 3 follow-ups | `qwen3.7-plus-2026-05-26` 17/17, keyword grading 12/17 |
+| Regression after switching the agent to `qwen3.6-plus-2026-04-02` and adding memory | keyword grading 23/23, LLM judge 23/23; 130,185 input and 9,730 output tokens |
+| Answer judge vs. 21 hand-labelled answers | `qwen3.7-plus-2026-05-26` 21/21 in two runs, keyword grading 14/21 |
 
 The near-miss row is the main finding: related chunks pass any usable threshold, so refusing those questions depends on the model and the system prompt.
 
@@ -172,7 +172,7 @@ Multi-turn baseline with conversation memory, agent `qwen3.6-plus-2026-04-02`, o
 
 About 1,650 tokens of every model call are the system prompt and tool definitions, so in short conversations that fixed cost is larger than the retrieval results.
 
-Known judge limitation: the answer judge sees the reference answer but not the source document, so it cannot tell whether an extra detail in an answer is true. In the regression run it failed two correct answers that added real handbook rules (the client entertainment approval rule and the 90-day receipt deadline for the home office budget), and the same answer passed in one grading run and failed in the next. Disagreements with keyword grading are listed by `judge_answers.py` and were checked by hand against the handbook.
+The answer judge checks every claim against the text sources the agent can search: the Markdown documents, vector collections, keyword indexes, and wiki. An earlier version saw only the reference answer, so it could not tell whether an extra detail was true: it failed correct answers that added real rules (the client entertainment approval rule, the 90-day home office receipt deadline, and the two-day rule in the keyword policy index), and one unchanged answer passed in one grading run and failed in the next. With the source text, those answers pass, and invented extra details and misstated related facts fail.
 
 ## Example Questions
 

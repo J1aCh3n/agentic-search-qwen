@@ -124,8 +124,8 @@
     "case_id": "conv-meal-per-person",
     "answer": "Yes. The employee handbook says the 260 Canadian dollar Toronto hotel cap applies per person per night.",
     "expected_pass": false,
-    "expected_failure_type": "missing_fact",
-    "note": "Resolves 'that' to the wrong policy. It contains 'per person' and a source, so keyword grading passes it. First labelled wrong_fact; the rubric defines wrong_fact as contradicting the reference, and this answer never mentions the meal allowance, so missing_fact is the label the rubric implies. The rubric has no category for an extra unsupported claim such as the hotel cap being per person."
+    "expected_failure_type": "wrong_fact",
+    "note": "Resolves 'that' to the wrong policy. It contains 'per person' and a source, so keyword grading passes it. The handbook never says the Toronto hotel cap applies per person, so the claim is unsupported and the source-document rubric makes it wrong_fact. Before the judge saw source documents it was labelled missing_fact, because that rubric had no category for an unsupported extra claim."
   },
   {
     "id": "fake-conv-europe-answered",
@@ -134,5 +134,37 @@
     "expected_pass": false,
     "expected_failure_type": "answered_instead_of_refusing",
     "note": "Refusal phrase followed by a general-knowledge recommendation. Keyword grading passes it."
+  },
+  {
+    "id": "real-home-office-true-extra-detail",
+    "case_id": "hb-home-office-paraphrase",
+    "answer": "Yes, the company provides a **one-time home office budget of 750 Canadian dollars** that can be used for a desk, chair, or monitor. \n\nAccording to the **Employee Handbook**, you must submit receipts for this budget within your **first ninety days of employment**.",
+    "expected_pass": true,
+    "expected_failure_type": "none",
+    "note": "Real answer that adds the 90-day receipt deadline, which the handbook states but the reference omits. The judge without source documents failed it in one run and passed it in another."
+  },
+  {
+    "id": "fake-home-office-invented-extra-detail",
+    "case_id": "hb-home-office-paraphrase",
+    "answer": "Yes. According to the employee handbook, each engineer gets a one-time home office budget of 750 Canadian dollars for a desk, chair, or monitor, and any unused amount is paid out as a bonus at the end of the year.",
+    "expected_pass": false,
+    "expected_failure_type": "wrong_fact",
+    "note": "Correct reference facts plus an invented payout rule. Keyword grading passes it; a judge without source documents cannot tell it is invented."
+  },
+  {
+    "id": "fake-bereavement-false-related-fact",
+    "case_id": "trap-bereavement",
+    "answer": "The demo dataset does not contain a bereavement leave policy. The employee handbook only covers vacation, parental leave, and fifteen paid sick days per year.",
+    "expected_pass": false,
+    "expected_failure_type": "wrong_fact",
+    "note": "Refuses correctly but misstates a related fact: the handbook gives ten paid sick days, not fifteen."
+  },
+  {
+    "id": "real-remote-cites-policy-index",
+    "case_id": "conv-topic-switch",
+    "answer": "According to the **Employee Handbook** (`employee_handbook.md`), engineers may work remotely **up to four days per week**. Each team also holds one shared on-site day at the Toronto office, which the team picks for itself.\n\n*Note: There is a general Remote Work Policy in the company policy index that states employees may work remotely up to two days per week with manager approval, but the Employee Handbook specifically grants engineers up to four days.*",
+    "expected_pass": true,
+    "expected_failure_type": "none",
+    "note": "Real answer that also reports the two-day remote work rule from the keyword policy index, which disagrees with the handbook. A judge given only data/docs called it a hallucination."
   }
 ]
