@@ -88,7 +88,11 @@ class LangChainSearchAgent:
             thread_id = str(uuid.uuid4())
         config = {
             "configurable": {"thread_id": thread_id},
-            "recursion_limit": MAX_SEARCH_ROUNDS * 2 + 1,
+            # recursion_limit counts graph steps, not search rounds, and LangGraph stops when
+            # the count reaches it, so it must be one more than the steps a turn may take.
+            # A turn of N rounds takes 2N + 2 steps: the router, model + tools per round,
+            # and the model's final answer.
+            "recursion_limit": MAX_SEARCH_ROUNDS * 2 + 3,
         }
         yield {
             "step": "init",
@@ -117,9 +121,9 @@ class LangChainSearchAgent:
 
         try:
             # stream_mode="updates" yields one dict per finished node:
-            #   {"model": {"messages": [AIMessage]}}    the model spoke
-            #   {"tools": {"messages": [ToolMessage]}}  a tool returned
-            # Each round is two graph steps (model + tools), hence * 2.
+            #   {"router": {"route": ..., "router_usage": ...}}  the tool group was chosen
+            #   {"model": {"messages": [AIMessage]}}              the model spoke
+            #   {"tools": {"messages": [ToolMessage]}}            a tool returned
             stream = self.agent.stream(
                 {"messages": [{"role": "user", "content": question}]},
                 config=config,

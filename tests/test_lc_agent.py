@@ -132,6 +132,12 @@ class ConversationMemoryTests(unittest.TestCase):
         self.assertEqual(humans(messages), ["question 1"])
         self.assertEqual(pending, ())
 
+    def test_exactly_the_round_limit_still_reaches_an_answer(self, _key):
+        # The limit counts tool rounds. The router step and the final answer must not use one up.
+        agent, _ = make_agent(tool_call("lookup", "c1"), tool_call("lookup", "c2"), reply("done"))
+        with patch("core.lc_agent.MAX_SEARCH_ROUNDS", 2):
+            self.assertEqual(agent.search("question", thread_id="t"), "done")
+
     def test_a_failed_first_turn_leaves_an_empty_thread(self, _key):
         # Rollback removes every message, so the next turn starts from nothing.
         agent, _ = make_agent(tool_call("broken", "c1"), reply("answer 2"))
