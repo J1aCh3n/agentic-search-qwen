@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+from pathlib import Path
 
 from config import DB_PATH
 
@@ -49,8 +50,14 @@ class DatabaseEngine:
         self.db_path = DB_PATH
         self.conn: sqlite3.Connection | None = None
 
-    def connect(self) -> None:
-        self.conn = sqlite3.connect(self.db_path)
+    def connect(self, read_only: bool = False) -> None:
+        if read_only:
+            # mode=ro makes SQLite itself refuse every write, whatever the SQL text says.
+            # It also refuses to create the file, so a missing database is an error
+            # instead of a new empty one.
+            self.conn = sqlite3.connect(Path(self.db_path).as_uri() + "?mode=ro", uri=True)
+        else:
+            self.conn = sqlite3.connect(self.db_path)
         self.conn.row_factory = sqlite3.Row
 
     def close(self) -> None:
@@ -170,8 +177,11 @@ class DatabaseEngine:
             self.close()
 
     def execute_sql(self, sql: str) -> str:
-        self.connect()
         try:
+            # The model writes this SQL, so the connection, not a keyword check, has to stop
+            # writes. Opening it inside try turns a missing database into an error message
+            # the model can read, instead of an exception that fails the whole turn.
+            self.connect(read_only=True)
             cursor = self.conn.cursor()
             cursor.execute(sql)
             rows = cursor.fetchall()

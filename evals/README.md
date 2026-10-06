@@ -27,7 +27,7 @@ python -m evals.eval_conversations --limit 1 # one conversation first, to check 
 python -m evals.eval_conversations           # all conversations; grade with judge_answers PATH
 python -m evals.judge_answers --calibrate    # check the answer judge against human labels
 python -m evals.judge_answers                # judge the latest eval_agent result
-python -m unittest tests.test_lc_agent evals.test_eval_retrieval_judge evals.test_judge_answers evals.test_eval_conversations
+python -m unittest tests.test_lc_agent tests.test_tools evals.test_eval_retrieval_judge evals.test_judge_answers evals.test_eval_conversations
 ```
 
 ## Design
