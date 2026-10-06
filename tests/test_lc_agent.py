@@ -213,8 +213,24 @@ class RouterTests(unittest.TestCase):
             def invoke(self, *a, **k):
                 raise RuntimeError("router is down")
 
-        result = router.create_router(Boom())("any question")
+        with self.assertLogs("agentic_search", level="WARNING") as logs:
+            result = router.create_router(Boom())("any question")
         self.assertEqual(result["category"], "unknown")
+        self.assertIn("router is down", logs.output[0])
+
+    def test_a_reply_without_a_category_falls_back_and_warns(self):
+        class NoToolCall:
+            def with_structured_output(self, *a, **k):
+                return self
+
+            def invoke(self, *a, **k):
+                return {"parsed": None, "raw": reply("I think this is about policies", input_tokens=400)}
+
+        with self.assertLogs("agentic_search", level="WARNING"):
+            result = router.create_router(NoToolCall())("any question")
+        self.assertEqual(result["category"], "unknown")
+        # The call still happened, so its cost still counts.
+        self.assertEqual(result["input_tokens"], 400)
 
 
 class FallbackTests(unittest.TestCase):

@@ -13,7 +13,7 @@ This is the `langgraph` branch, the last of three that show the same assistant r
 - Streamlit interface for interactive search and trace inspection
 - CLI entry point for terminal-based testing
 - LangChain tool-calling agent with a Qwen-compatible chat model
-- SQLite search over structured enterprise records
+- SQLite search over structured enterprise records; SQL written by the model runs on a read-only connection, so SQLite itself refuses writes
 - Chroma vector search over synthetic company documents, engineering documents, and Markdown source documents
 - Real semantic embeddings from DashScope (`text-embedding-v4`), replacing the hash-based placeholder the first version used
 - Markdown documents in `data/docs/` are loaded, split into overlapping chunks, and stored with `source` and `chunk_index` metadata
@@ -133,7 +133,7 @@ The CLI keeps one conversation for the whole session; type `new` to start anothe
 Offline tests (no API calls; a fake model stands in for Qwen):
 
 ```powershell
-python -m unittest tests.test_lc_agent evals.test_eval_retrieval_judge evals.test_judge_answers evals.test_eval_conversations evals.test_eval_runs
+python -m unittest tests.test_lc_agent tests.test_tools evals.test_eval_retrieval_judge evals.test_judge_answers evals.test_eval_conversations evals.test_eval_runs
 ```
 
 Force-regenerate demo data:

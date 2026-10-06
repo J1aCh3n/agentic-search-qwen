@@ -43,6 +43,8 @@ def build_tools(
     @tool
     def database_sql(sql: str) -> str:
         """Execute a read-only SQLite SELECT query over employees, departments, projects, contracts, or products."""
+        # These checks only give the model a clear message. They miss a keyword after a
+        # newline, so the protection is the read-only connection in execute_sql().
         normalized = f" {sql.strip().lower()} "
         if not normalized.strip().startswith("select"):
             return json.dumps({"error": "Only SELECT statements are allowed."})
@@ -112,11 +114,18 @@ def build_tools(
     @tool
     def list_sources() -> str:
         """List available demo data sources and their schemas."""
+        repo = json.loads(code_engine.list_files())
         payload = {
             "sqlite_schema": json.loads(db.get_schema()),
             "vector_collections": json.loads(vector_db.get_all_collections_info()),
             "keyword_indexes": json.loads(keyword_engine.get_all_indexes_info()),
             "enterprise_systems": json.loads(enterprise_sdk.list_systems()),
+            # Top-level entries only. The full file list would add about 500 tokens to every
+            # call, and code_search already finds a file by name when one is needed.
+            "code_repository": {
+                "total_files": repo.get("total_files", 0),
+                "top_level": sorted({path.replace("\\", "/").split("/")[0] for path in repo.get("files", [])}),
+            },
         }
         return json.dumps(payload, indent=2, ensure_ascii=False)
 

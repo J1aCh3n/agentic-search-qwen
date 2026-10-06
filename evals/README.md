@@ -29,7 +29,7 @@ python -m evals.eval_conversations           # all conversations; grade with jud
 python -m evals.eval_conversations --no-router  # conversation baseline without the router
 python -m evals.judge_answers --calibrate    # check the answer judge against human labels
 python -m evals.judge_answers                # judge the latest eval_agent result
-python -m unittest tests.test_lc_agent evals.test_eval_retrieval_judge evals.test_judge_answers evals.test_eval_conversations evals.test_eval_runs
+python -m unittest tests.test_lc_agent tests.test_tools evals.test_eval_retrieval_judge evals.test_judge_answers evals.test_eval_conversations evals.test_eval_runs
 ```
 
 ## Design
