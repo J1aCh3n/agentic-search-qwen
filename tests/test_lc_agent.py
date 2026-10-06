@@ -131,6 +131,12 @@ class ConversationMemoryTests(unittest.TestCase):
         self.assertEqual(humans(messages), ["question 1"])
         self.assertEqual(pending, ())
 
+    def test_exactly_the_round_limit_still_reaches_an_answer(self, _key):
+        # The limit counts tool rounds. The final answer must not use one up.
+        agent, _ = make_agent(tool_call("lookup", "c1"), tool_call("lookup", "c2"), reply("done"))
+        with patch("core.lc_agent.MAX_SEARCH_ROUNDS", 2):
+            self.assertEqual(agent.search("question", thread_id="t"), "done")
+
     def test_usage_sums_model_calls_and_keeps_last_context_size(self, _key):
         agent, _ = make_agent(
             AIMessage(content="", tool_calls=[{"name": "lookup", "args": {"query": "x"}, "id": "c1"}],
